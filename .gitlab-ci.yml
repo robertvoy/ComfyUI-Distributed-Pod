@@ -1,0 +1,21 @@
+stages:
+  - build
+
+build-docker:
+  stage: build
+  image: docker:stable  # Uses a Docker-in-Docker base for building
+  services:
+    - docker:dind  # Enables Docker-in-Docker
+  variables:
+    DOCKER_DRIVER: overlay2  # Efficient storage for large layers
+  before_script:
+    - echo "Clearing space on runner..."
+    - apk add --no-cache sudo  # For Alpine-based image (add if needed for cleanup)
+    - sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost || true  # Adapted cleanup; ignore errors
+    - df -h  # Log space
+    - docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN
+  script:
+    - docker build -f Dockerfile -t robertvoy/comfyui-distributed-pod:latest .
+    - docker push robertvoy/comfyui-distributed-pod:latest
+  tags:
+    - docker  # Use runners with Docker support
