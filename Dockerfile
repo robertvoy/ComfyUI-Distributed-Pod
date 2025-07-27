@@ -84,8 +84,9 @@ COPY --from=builder /ComfyUI /ComfyUI
 RUN pip install --no-cache-dir opencv-python && \
     rm -rf /root/.cache/pip/* /tmp/* && pip cache purge
 
-# Copy and set up start script
+# Copy and set up start scripts
 COPY src/start_script.sh /start_script.sh
-RUN chmod +x /start_script.sh
+COPY src/start.sh /fallback_start.sh
+RUN chmod +x /start_script.sh /fallback_start.sh
 
 CMD ["/start_script.sh"]

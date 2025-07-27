@@ -54,6 +54,10 @@ else
     echo "Directory already exists, skipping move."
 fi
 
+# Ensure required directories exist
+mkdir -p "$CUSTOM_NODES_DIR"
+mkdir -p "$WORKFLOW_DIR"
+
 echo "Downloading CivitAI download script to /usr/local/bin"
 git clone "https://github.com/Hearmeman24/CivitAI_Downloader.git" || { echo "Git clone failed"; exit 1; }
 mv CivitAI_Downloader/download_with_aria.py "/usr/local/bin/" || { echo "Move failed"; exit 1; }
@@ -62,19 +66,19 @@ rm -rf CivitAI_Downloader  # Clean up the cloned repo
 pip install onnxruntime-gpu &
 
 if [ ! -d "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper" ]; then
-    cd $NETWORK_VOLUME/ComfyUI/custom_nodes
+    cd "$CUSTOM_NODES_DIR" || { echo "Failed to cd to custom_nodes"; exit 1; }
     git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git
 else
     echo "Updating WanVideoWrapper"
-    cd $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper
+    cd "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper" || { echo "Failed to cd to WanVideoWrapper"; exit 1; }
     git pull
 fi
 if [ ! -d "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes" ]; then
-    cd $NETWORK_VOLUME/ComfyUI/custom_nodes
+    cd "$CUSTOM_NODES_DIR" || { echo "Failed to cd to custom_nodes"; exit 1; }
     git clone https://github.com/kijai/ComfyUI-KJNodes.git
 else
     echo "Updating KJ Nodes"
-    cd $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes
+    cd "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes" || { echo "Failed to cd to KJNodes"; exit 1; }
     git pull
 fi
 
@@ -103,7 +107,7 @@ echo "Background build started (PID: $BUILD_PID)"
 
 
 # Change to the directory
-cd "$CUSTOM_NODES_DIR" || exit 1
+cd "$CUSTOM_NODES_DIR" || { echo "Failed to cd to custom_nodes directory"; exit 1; }
 
 # Function to download a model using huggingface-cli
 download_model() {
