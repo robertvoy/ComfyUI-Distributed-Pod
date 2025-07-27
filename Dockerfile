@@ -1,5 +1,5 @@
 # Use multi-stage build with caching optimizations
-FROM pytorch/pytorch:nightly-devel-cuda12.8-cudnn9-ubuntu24.04 AS base
+FROM pytorch/pytorch:nightly-cuda12.8-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
