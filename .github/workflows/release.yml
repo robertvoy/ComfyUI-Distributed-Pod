@@ -32,7 +32,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        id: buildx # Give the step an id to reference its outputs
+        id: buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
@@ -45,10 +45,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: . # Use current directory as context
-          file: ./Dockerfile # Path to your Dockerfile (capital D now)
+          context: .
+          file: ./Dockerfile
           push: true # Actually push the image
-          tags: robertvoy/comfyui-pod-wan:latest # Your image name and tag
+          tags: robertvoy/comfyui-distributed-pod:latest
           builder: ${{ steps.buildx.outputs.name }} # Use the buildx builder
           # Optional: Enable build caching using GitHub Actions Cache
           # cache-from: type=gha
