@@ -88,13 +88,8 @@ fi
 
 # Skip configuration updates for preview method
 
-# Root as main working directory and update prompt (for Bash)
-echo "cd /" >> ~/.bashrc
-echo 'export PS1="\u@\h:\w# "' >> ~/.bashrc
-
-# Add similar settings to ~/.profile for sh compatibility
-echo "cd /" >> ~/.profile
-echo 'PS1="\u@\h:\w# "' >> ~/.profile
+# Root as main working directory
+cd /
 
 # Start ComfyUI
 echo "▶️  Starting ComfyUI"
@@ -103,9 +98,9 @@ if [ "$enable_optimizations" = "false" ]; then
 else
     nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
     until curl --silent --fail "$URL" --output /dev/null; do
-      echo "🔄  ComfyUI Starting Up... You can view the startup logs here: /comfyui_${RUNPOD_POD_ID}_nohup.log"
+      echo "ComfyUI Starting Up... You can view the startup logs here: /comfyui_${RUNPOD_POD_ID}_nohup.log"
       sleep 2
     done
-    echo "🚀 ComfyUI is UP"
+    echo "ComfyUI is ready"
     sleep infinity
 fi
