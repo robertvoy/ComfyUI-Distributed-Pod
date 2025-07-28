@@ -161,7 +161,7 @@ echo "Launching ComfyUI"
 if [ "$sage_attention" = "false" ]; then
     python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header
 else
-    nohup python3 "$COMFYUI_DIR/main.py" --listen --use-sage-attention --enable-cors-header > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
+    nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header --use-sage-attention > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
     until curl --silent --fail "$URL" --output /dev/null; do
       echo "Launching ComfyUI"
       sleep 2
