@@ -28,11 +28,11 @@ NETWORK_VOLUME="/"
 echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 
-COMFYUI_DIR="ComfyUI"
-WORKFLOW_DIR="ComfyUI/user/default/workflows"
+COMFYUI_DIR="/ComfyUI"
+WORKFLOW_DIR="/ComfyUI/user/default/workflows"
 
 # Set the target directory
-CUSTOM_NODES_DIR="ComfyUI/custom_nodes"
+CUSTOM_NODES_DIR="/ComfyUI/custom_nodes"
 
 # Skip downloading CivitAI download script, custom nodes, and model downloads
 
@@ -45,16 +45,16 @@ CUSTOM_NODES_DIR="ComfyUI/custom_nodes"
 # Skip configuration updates for preview method
 
 # Workspace as main working directory (but since base is root, adjust accordingly)
-# echo "cd $NETWORK_VOLUME" >> ~/.bashrc
+echo "cd $NETWORK_VOLUME" >> ~/.bashrc
 
 # Skip dependency installations for custom nodes (since not installing them)
 
 # Start ComfyUI
 echo "▶️  Starting ComfyUI"
 if [ "$enable_optimizations" = "false" ]; then
-    python3 "ComfyUI/main.py" --listen --enable-cors-header
+    python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header
 else
-    nohup python3 "ComfyUI/main.py" --listen --enable-cors-header > "$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
+    nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header > "$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
     until curl --silent --fail "$URL" --output /dev/null; do
       echo "🔄  ComfyUI Starting Up... You can view the startup logs here: $NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log"
       sleep 2
