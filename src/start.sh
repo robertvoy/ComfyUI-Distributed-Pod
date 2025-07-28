@@ -88,6 +88,14 @@ fi
 
 # Skip configuration updates for preview method
 
+# Root as main working directory and update prompt (for Bash)
+echo "cd /" >> ~/.bashrc
+echo 'export PS1="\u@\h:\w# "' >> ~/.bashrc
+
+# Add similar settings to ~/.profile for sh compatibility
+echo "cd /" >> ~/.profile
+echo 'PS1="\u@\h:\w# "' >> ~/.profile
+
 # Start ComfyUI
 echo "▶️  Starting ComfyUI"
 if [ "$enable_optimizations" = "false" ]; then
