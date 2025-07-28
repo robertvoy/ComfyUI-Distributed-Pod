@@ -66,7 +66,7 @@ RUN for repo in \
     https://github.com/chflame163/ComfyUI_LayerStyle.git \
     https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git \
     https://github.com/yolain/ComfyUI-Easy-Use.git \
-    https://github.com/city96/ComfyUI-GGUF.git \
+    https://github.com/city96/ComfyUI-GGUF.git; \
     do \
         cd /ComfyUI/custom_nodes; \
         repo_dir=$(basename "$repo" .git); \
