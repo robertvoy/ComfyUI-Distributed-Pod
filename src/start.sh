@@ -65,7 +65,7 @@ echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 
 # Only build SageAttention if sage_attention are enabled
-if [ "$sage_attention" != "false" ]; then
+if [ "$SAGE_ATTENTION" != "false" ]; then
     echo "Building SageAttention in the background"
     (
       git clone https://github.com/thu-ml/SageAttention.git
@@ -158,7 +158,7 @@ fi
 
 # Start ComfyUI
 echo "Launching ComfyUI"
-if [ "$sage_attention" = "false" ]; then
+if [ "$SAGE_ATTENTION" = "false" ]; then
     python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header
 else
     nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header --use-sage-attention > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
