@@ -4,6 +4,15 @@
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
+# This is in case there's any special installs or overrides that needs to occur when starting the machine before starting ComfyUI
+if [ -f "/workspace/additional_params.sh" ]; then
+    chmod +x /workspace/additional_params.sh
+    echo "Executing additional_params.sh..."
+    /workspace/additional_params.sh
+else
+    echo "additional_params.sh not found in /workspace. Skipping..."
+fi
+
 if ! which aria2 > /dev/null 2>&1; then
     echo "Installing aria2..."
     apt-get update && apt-get install -y aria2
@@ -54,6 +63,24 @@ fi
 
 echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
+
+# Only build SageAttention if sage_attention are enabled
+if [ "$sage_attention" != "false" ]; then
+    echo "Building SageAttention in the background"
+    (
+      git clone https://github.com/thu-ml/SageAttention.git
+      cd SageAttention || exit 1
+      python3 setup.py install
+      cd /
+      pip install --no-cache-dir triton
+    ) &> /var/log/sage_build.log &      # run in background, log output
+
+    BUILD_PID=$!
+    echo "Background build started (PID: $BUILD_PID)"
+else
+    echo "sage_attention disabled, skipping SageAttention build"
+    BUILD_PID=""
+fi
 
 # Copy workflows from ComfyUI-Distributed-Pod
 mkdir -p "$WORKFLOW_DIR"
@@ -107,18 +134,36 @@ comfyui:
 EOL
 fi
 
-# ComfyUI manager config
+# Create required model directories if they don't exist
+echo "Creating model directories..."
+mkdir -p /workspace/ComfyUI/models/checkpoints/
+mkdir -p /workspace/ComfyUI/models/clip/
+mkdir -p /workspace/ComfyUI/models/vae/
+mkdir -p /workspace/ComfyUI/models/controlnet/
+mkdir -p /workspace/ComfyUI/models/diffusion_models/
+mkdir -p /workspace/ComfyUI/models/unet/
+mkdir -p /workspace/ComfyUI/models/loras/
+mkdir -p /workspace/ComfyUI/models/clip_vision/
+mkdir -p /workspace/ComfyUI/models/upscale_models/
 
-# Optional building SageAttention
+# Wait for SageAttention build to complete (only if it was started)
+if [ -n "$BUILD_PID" ]; then
+    # poll every 5 s until the PID is gone
+    while kill -0 "$BUILD_PID" 2>/dev/null; do
+        echo "SageAttention build in progress... (this can take up to 5 minutes)"
+        sleep 10
+    done
+    echo "Build complete"
+fi
 
 # Start ComfyUI
-echo "▶️  Starting ComfyUI"
-if [ "$enable_optimizations" = "false" ]; then
+echo "Launching ComfyUI"
+if [ "$sage_attention" = "false" ]; then
     python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header
 else
-    nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
+    nohup python3 "$COMFYUI_DIR/main.py" --listen --use-sage-attention --enable-cors-header > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
     until curl --silent --fail "$URL" --output /dev/null; do
-      echo "ComfyUI Starting Up... You can view the startup logs here: /comfyui_${RUNPOD_POD_ID}_nohup.log"
+      echo "Launching ComfyUI"
       sleep 2
     done
     echo "ComfyUI is ready"
