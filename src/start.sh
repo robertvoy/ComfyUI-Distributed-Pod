@@ -107,18 +107,9 @@ comfyui:
 EOL
 fi
 
-# Skip downloading CivitAI download script, custom nodes, and model downloads
+# ComfyUI manager config
 
-# Skip building SageAttention
-
-# Skip additional model downloads and upscale models
-
-# Skip workflow copying (assuming it's not needed or can be skipped for simplification)
-
-# Skip configuration updates for preview method
-
-# Root as main working directory
-cd /
+# Optional building SageAttention
 
 # Start ComfyUI
 echo "▶️  Starting ComfyUI"
