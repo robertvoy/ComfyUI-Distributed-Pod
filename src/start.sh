@@ -52,9 +52,6 @@ if ! dpkg -s bash-completion > /dev/null 2>&1; then
     apt-get update && apt-get install -y bash-completion
 fi
 
-# Root as main working directory
-echo "cd /" >> ~/.bashrc
-
 echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 
