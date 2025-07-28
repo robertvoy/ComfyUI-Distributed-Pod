@@ -28,7 +28,7 @@ jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --Note
 
 # Copy workflows from ComfyUI-Distributed-Pod
 mkdir -p "$WORKFLOW_DIR"
-SOURCE_WORKFLOW_DIR="workspace/ComfyUI-Distributed-Pod/workflows"
+SOURCE_WORKFLOW_DIR="/workspace/ComfyUI-Distributed-Pod/workflows"
 if [ -d "$SOURCE_WORKFLOW_DIR" ]; then
     cp -r "$SOURCE_WORKFLOW_DIR/"* "$WORKFLOW_DIR/"
     echo "Workflows copied successfully."
@@ -37,7 +37,7 @@ else
 fi
 
 # Copy extra_model_paths.yaml
-SOURCE_YAML="workspace/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml"
+SOURCE_YAML="/workspace/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml"
 if [ -f "$SOURCE_YAML" ]; then
     cp "$SOURCE_YAML" "$COMFYUI_DIR/extra_model_paths.yaml"
     echo "extra_model_paths.yaml copied successfully."
@@ -45,7 +45,7 @@ else
     echo "YAML source file not found: $SOURCE_YAML. Creating from provided contents..."
     cat <<EOL > "$COMFYUI_DIR/extra_model_paths.yaml"
 comfyui:
-      base_path: workspace/ComfyUI
+      base_path: /workspace/ComfyUI
       is_default: true
       BiRefNet: models/BiRefNet/
       checkpoints: models/checkpoints/
