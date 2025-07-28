@@ -23,6 +23,35 @@ COMFYUI_DIR="/ComfyUI"
 WORKFLOW_DIR="/ComfyUI/user/default/workflows"
 CUSTOM_NODES_DIR="/ComfyUI/custom_nodes"
 
+export SHELL=/bin/bash
+
+# Create a basic .bashrc for root to show the directory in the prompt and enable full bash features
+if [ ! -f /root/.bashrc ]; then
+    cat <<EOF > /root/.bashrc
+# ~/.bashrc: executed by bash(1) for non-login shells.
+
+# If not running interactively, don't do anything
+[ -z "\$PS1" ] && return
+
+# Set a fancy prompt (non-color, unless we know we "want" color)
+PS1='\u@\h:\w\# '
+
+# Enable programmable completion features (you don't need to enable
+# this, if it's already enabled in /etc/bash.bashrc and /etc/profile
+# sources /etc/bash.bashrc).
+if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
+    . /etc/bash_completion
+fi
+EOF
+    echo ".bashrc created for root."
+fi
+
+# Install bash-completion if not present (for advanced command completion; basic file/dir completion works without it)
+if ! dpkg -s bash-completion > /dev/null 2>&1; then
+    echo "Installing bash-completion..."
+    apt-get update && apt-get install -y bash-completion
+fi
+
 echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 

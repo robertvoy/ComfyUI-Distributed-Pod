@@ -1,5 +1,5 @@
 # Use multi-stage build with caching optimizations
-FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS base
+FROM pytorch/pytorch:2.3.0-cuda11.8-cudnn8-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     CMAKE_BUILD_PARALLEL_LEVEL=8
 
-# Install system dependencies
+# Install system dependencies (shared in base)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -29,16 +29,29 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     rm -rf /root/.cache/pip/* /tmp/* && pip cache purge
 
 # ------------------------------------------------------------
-# ComfyUI install
+# ComfyUI install (in base, as it's shared)
 # ------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
     /usr/bin/yes | comfy --workspace /ComfyUI install && \
     rm -rf /root/.cache/pip/* /tmp/* && pip cache purge
 
-# Builder stage for custom nodes (to keep final image slimmer)
+# Builder stage for custom nodes and dependencies
 FROM base AS builder
 
-# Install custom nodes
+# Add extra build dependencies for compiled packages (e.g., scikit-image, matplotlib)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gfortran libatlas-base-dev libopenblas-dev liblapack-dev \
+        libpng-dev libjpeg-dev libfreetype6-dev pkg-config && \
+    apt-get autoremove -y && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
+
+# Create a virtualenv for isolated dependencies
+RUN python -m venv /app_venv
+ENV PATH="/app_venv/bin:$PATH"
+
+# Install custom nodes inside venv
 RUN for repo in \
     https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git \
     https://github.com/kijai/ComfyUI-KJNodes.git \
@@ -71,8 +84,12 @@ RUN for repo in \
             python "$repo_dir/install.py"; \
         fi; \
     done && \
+    # Manually install unlisted/missing deps for specific nodes
+    pip install --no-cache-dir matplotlib imageio-ffmpeg && \
+    # Upgrade conflicting packages (e.g., for diffusers/huggingface_hub issues)
+    pip install --no-cache-dir --upgrade diffusers huggingface_hub && \
     find /ComfyUI -type d -name "__pycache__" -exec rm -rf {} + && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* && pip cache purge
 
 # Final stage
 FROM base AS final
@@ -80,7 +97,13 @@ FROM base AS final
 # Copy ComfyUI and custom nodes from builder
 COPY --from=builder /ComfyUI /ComfyUI
 
-# Additional final installs
+# Copy the venv from builder
+COPY --from=builder /app_venv /app_venv
+
+# Add venv to PATH for runtime (alternatively, activate in start_script.sh)
+ENV PATH="/app_venv/bin:$PATH"
+
+# Additional final installs (e.g., opencv-python, but now in venv)
 RUN pip install --no-cache-dir opencv-python && \
     rm -rf /root/.cache/pip/* /tmp/* && pip cache purge
 
