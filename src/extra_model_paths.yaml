@@ -1,5 +1,5 @@
 comfyui:
-      base_path: workspace/ComfyUI
+      base_path: /workspace/ComfyUI
       is_default: true
       BiRefNet: models/BiRefNet/
       checkpoints: models/checkpoints/
