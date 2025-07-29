@@ -157,10 +157,9 @@ if [ -n "$BUILD_PID" ]; then
 fi
 
 # Update ComfyUI-Distributed to feature/cloud-workers branch
-echo "Updating ComfyUI-Distributed to feature/cloud-workers branch..."
+echo "Updating ComfyUI-Distributed."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed/
-git fetch origin
-git checkout feature/cloud-workers
+git pull
 
 # Start ComfyUI
 echo "Launching ComfyUI"
