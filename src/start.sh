@@ -156,16 +156,23 @@ if [ -n "$BUILD_PID" ]; then
     echo "Build complete"
 fi
 
+# Update ComfyUI-Distributed to feature/cloud-workers branch
+echo "Updating ComfyUI-Distributed to feature/cloud-workers branch..."
+cd /ComfyUI/custom_nodes/ComfyUI-Distributed/
+git fetch origin
+git checkout feature/cloud-workers
+
 # Start ComfyUI
 echo "Launching ComfyUI"
 if [ "$SAGE_ATTENTION" = "false" ]; then
-    python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header
+    nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
 else
     nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header --use-sage-attention > "/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
-    until curl --silent --fail "$URL" --output /dev/null; do
-      echo "Launching ComfyUI"
-      sleep 2
-    done
-    echo "ComfyUI is ready"
-    sleep infinity
 fi
+
+until curl --silent --fail "$URL" --output /dev/null; do
+  echo "Launching ComfyUI"
+  sleep 2
+done
+echo "ComfyUI is ready"
+sleep infinity
