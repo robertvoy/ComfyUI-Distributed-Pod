@@ -161,6 +161,16 @@ echo "Updating ComfyUI-Distributed."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed/
 git pull
 
+# Update WanVideoWrapper
+echo "Updating WanVideoWrapper."
+cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/
+git pull
+
+# Update KJNodes
+echo "Updating KJNodes."
+cd /ComfyUI/custom_nodes/ComfyUI-KJNodes/
+git pull
+
 # Start ComfyUI
 echo "Launching ComfyUI"
 if [ "$SAGE_ATTENTION" = "false" ]; then
