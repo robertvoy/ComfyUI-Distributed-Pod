@@ -156,6 +156,11 @@ if [ -n "$BUILD_PID" ]; then
     echo "Build complete"
 fi
 
+# Update ComfyUI
+cd /ComfyUI/
+git pull
+pip install -r /ComfyUI/requirements.txt
+
 # Update ComfyUI-Distributed
 echo "Updating ComfyUI-Distributed."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed/
