@@ -2,7 +2,7 @@
 
 # --- Speedy HF downloads: install and enable hf_transfer ---------------------
 # (Done early so any HF downloads benefit.)
-python3 -m pip install -U "huggingface_hub[cli]" hf_transfer >/dev/null 2>&1 || true
+pip install -U "huggingface_hub[cli]" hf_transfer >/dev/null 2>&1 || true
 export HF_HUB_ENABLE_HF_TRANSFER=1
 # Optional: keep cache in a predictable place
 export HF_HOME=/workspace/.cache/huggingface
