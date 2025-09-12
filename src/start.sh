@@ -103,33 +103,38 @@ if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
       cd RES4LYF || exit 1
       pip install -r requirements.txt
       
-      # Use aria2c for faster parallel downloads
-      echo "Downloading UNET model..."
-      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/diffusion_models/ \
-        -o wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors \
-        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+      # Create aria2 input file for parallel downloads
+      cat > /tmp/video_upscaler_downloads.txt << 'EOF'
+https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
+dir=/workspace/ComfyUI/models/diffusion_models
+out=wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
+
+https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors
+dir=/workspace/ComfyUI/models/clip
+out=umt5_xxl_fp16.safetensors
+
+https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
+dir=/workspace/ComfyUI/models/vae
+out=wan_2.1_vae.safetensors
+
+https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors
+dir=/workspace/ComfyUI/models/loras
+out=low_noise_model.safetensors
+      EOF
       
-      echo "Downloading CLIP model..."
-      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/clip/ \
-        -o umt5_xxl_fp16.safetensors \
-        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors"
+      echo "Starting parallel downloads of Video Upscaler models..."
+      # Run aria2c with parallel downloads and progress reporting
+      aria2c -x 16 -s 16 -j 4 --console-log-level=notice --summary-interval=10 \
+             --input-file=/tmp/video_upscaler_downloads.txt
       
-      echo "Downloading VAE model..."
-      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/vae/ \
-        -o wan_2.1_vae.safetensors \
-        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-      
-      echo "Downloading LoRA model..."
-      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/loras/ \
-        -o low_noise_model.safetensors \
-        "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors"
-      
-      # Rename LoRA to match workflow name
+      # Rename LoRA
       if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ]; then
         mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
            /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
         echo "LoRA renamed successfully"
       fi
+      
+      echo "Video Upscaler setup completed"
     ) &> /var/log/video_upscaler_setup.log &
     
     VIDEO_UPSCALER_PID=$!
@@ -191,25 +196,6 @@ comfyui:
 EOL
 fi
 
-# Wait for Video Upscaler setup to complete (only if it was started)
-if [ -n "$VIDEO_UPSCALER_PID" ]; then
-    while kill -0 "$VIDEO_UPSCALER_PID" 2>/dev/null; do
-        echo "Video Upscaler setup in progress..."
-        sleep 10
-    done
-    echo "Video Upscaler setup complete"
-fi
-
-# Wait for SageAttention build to complete (only if it was started)
-if [ -n "$BUILD_PID" ]; then
-    # poll every 5 s until the PID is gone
-    while kill -0 "$BUILD_PID" 2>/dev/null; do
-        echo "SageAttention build in progress... (this can take up to 5 minutes)"
-        sleep 10
-    done
-    echo "Build complete"
-fi
-
 # Update ComfyUI
 cd /ComfyUI/
 git pull
@@ -229,6 +215,49 @@ git pull
 echo "Updating KJNodes."
 cd /ComfyUI/custom_nodes/ComfyUI-KJNodes/
 git pull
+
+# Function to monitor download progress
+monitor_download_progress() {
+    local pid=$1
+    local name=$2
+    local log_file=$3
+    local last_progress=""
+    
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ -f "$log_file" ]; then
+            # Look for aria2c progress indicators
+            current_progress=$(grep -E "(\[[#\.]+\]|Download complete:|ERROR|SEED)" "$log_file" | tail -1)
+            if [ "$current_progress" != "$last_progress" ] && [ -n "$current_progress" ]; then
+                echo "$name: $current_progress"
+                last_progress="$current_progress"
+            fi
+        fi
+        sleep 5
+    done
+    
+    # Final check for completion or errors
+    if [ -f "$log_file" ]; then
+        if grep -q "ERROR" "$log_file"; then
+            echo "$name: Completed with errors. Check $log_file for details."
+        else
+            echo "$name: Complete"
+        fi
+    fi
+}
+
+if [ -n "$VIDEO_UPSCALER_PID" ]; then
+    echo "Waiting for Video Upscaler downloads to complete..."
+    monitor_download_progress "$VIDEO_UPSCALER_PID" "Video Upscaler" "/var/log/video_upscaler_setup.log"
+fi
+
+if [ -n "$BUILD_PID" ]; then
+    echo "Waiting for SageAttention build to complete..."
+    while kill -0 "$BUILD_PID" 2>/dev/null; do
+        echo "SageAttention build in progress... (this can take up to 5 minutes)"
+        sleep 10
+    done
+    echo "SageAttention build complete"
+fi
 
 # Start ComfyUI
 echo "Launching ComfyUI"
