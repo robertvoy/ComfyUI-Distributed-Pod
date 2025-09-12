@@ -13,7 +13,7 @@ else
     echo "additional_params.sh not found in /workspace. Skipping..."
 fi
 
-if ! which aria2 > /dev/null 2>&1; then
+if ! which aria2c > /dev/null 2>&1; then
     echo "Installing aria2..."
     apt-get update && apt-get install -y aria2
 else
@@ -94,53 +94,80 @@ else
     BUILD_PID=""
 fi
 
+# Function for Hugging Face downloads (skip if exists, aria2c with progress)
+download_hf_model() {
+    local url="$1"
+    local dest_dir="$2"
+    local filename="$3"
+    local dest="$dest_dir/$filename"
+
+    mkdir -p "$dest_dir"
+
+    if [ -f "$dest" ]; then
+        echo "[SKIP] $filename already exists in $dest_dir"
+        return
+    fi
+
+    echo "[DOWNLOAD] $filename"
+    aria2c -x 16 -s 16 -j 4 -c \
+           -o "$filename" -d "$dest_dir" \
+           --header="Authorization: Bearer $HF_API_TOKEN" \
+           "$url"
+    echo "[DONE] $filename"
+}
+
 # Only prepare Video Upscaler Preset if enabled
 if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
     echo "Preparing Video Upscaler Preset in the background"
     (
+      set -e
       cd /ComfyUI/custom_nodes/
-      git clone https://github.com/ClownsharkBatwing/RES4LYF/
+
+      if [ ! -d "RES4LYF" ]; then
+          git clone https://github.com/ClownsharkBatwing/RES4LYF/
+      else
+          echo "RES4LYF already exists, skipping clone"
+      fi
+
       cd RES4LYF || exit 1
       pip install -r requirements.txt
-      
-      # Create aria2 input file for parallel downloads
-      cat > /tmp/video_upscaler_downloads.txt << 'EOF'
-https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
- dir=/workspace/ComfyUI/models/diffusion_models
- out=wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
 
-https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors
- dir=/workspace/ComfyUI/models/clip
- out=umt5_xxl_fp16.safetensors
+      # Download required models
+      download_hf_model \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
+        "/workspace/ComfyUI/models/diffusion_models" \
+        "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
 
-https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
- dir=/workspace/ComfyUI/models/vae
- out=wan_2.1_vae.safetensors
+      download_hf_model \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors" \
+        "/workspace/ComfyUI/models/clip" \
+        "umt5_xxl_fp16.safetensors"
 
-https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors
- dir=/workspace/ComfyUI/models/loras
- out=low_noise_model.safetensors
+      download_hf_model \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" \
+        "/workspace/ComfyUI/models/vae" \
+        "wan_2.1_vae.safetensors"
 
-https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors
- dir=/workspace/ComfyUI/models/upscale_models
- out=4xNomos8kDAT.safetensors
-EOF
-      
-      echo "Starting parallel downloads of Video Upscaler models..."
-      # Run aria2c with parallel downloads and progress reporting
-      aria2c -x 16 -s 16 -j 4 --console-log-level=notice --summary-interval=10 \
-             --input-file=/tmp/video_upscaler_downloads.txt
-      
-      # Rename LoRA
+      download_hf_model \
+        "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
+        "/workspace/ComfyUI/models/loras" \
+        "low_noise_model.safetensors"
+
+      download_hf_model \
+        "https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors" \
+        "/workspace/ComfyUI/models/upscale_models" \
+        "4xNomos8kDAT.safetensors"
+
+      # Rename LoRA after download
       if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ]; then
-        mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
-           /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
-        echo "LoRA renamed successfully"
+          mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
+             /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
+          echo "LoRA renamed successfully"
       fi
-      
+
       echo "Video Upscaler setup completed"
     ) &> /var/log/video_upscaler_setup.log &
-    
+
     VIDEO_UPSCALER_PID=$!
     echo "Video Upscaler setup started in background (PID: $VIDEO_UPSCALER_PID)"
 else
@@ -230,7 +257,7 @@ monitor_download_progress() {
     while kill -0 "$pid" 2>/dev/null; do
         if [ -f "$log_file" ]; then
             # Look for aria2c progress indicators
-            current_progress=$(grep -E "(\[[#\.]+\]|Download complete:|ERROR|SEED)" "$log_file" | tail -1)
+            current_progress=$(grep -E "(Download complete|ERROR)" "$log_file" | tail -1)
             if [ "$current_progress" != "$last_progress" ] && [ -n "$current_progress" ]; then
                 echo "$name: $current_progress"
                 last_progress="$current_progress"
