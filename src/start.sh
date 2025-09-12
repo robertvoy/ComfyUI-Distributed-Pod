@@ -64,6 +64,18 @@ fi
 echo "Starting JupyterLab on root directory..."
 jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 
+# Create required model directories if they don't exist
+echo "Creating model directories..."
+mkdir -p /workspace/ComfyUI/models/checkpoints/
+mkdir -p /workspace/ComfyUI/models/clip/
+mkdir -p /workspace/ComfyUI/models/vae/
+mkdir -p /workspace/ComfyUI/models/controlnet/
+mkdir -p /workspace/ComfyUI/models/diffusion_models/
+mkdir -p /workspace/ComfyUI/models/unet/
+mkdir -p /workspace/ComfyUI/models/loras/
+mkdir -p /workspace/ComfyUI/models/clip_vision/
+mkdir -p /workspace/ComfyUI/models/upscale_models/
+
 # Only build SageAttention if sage_attention are enabled
 if [ "$SAGE_ATTENTION" != "false" ]; then
     echo "Building SageAttention in the background"
@@ -80,6 +92,41 @@ if [ "$SAGE_ATTENTION" != "false" ]; then
 else
     echo "sage_attention disabled, skipping SageAttention build"
     BUILD_PID=""
+fi
+
+# Only prepare Video Upscaler Preset if enabled
+if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
+    echo "Preparing Video Upscaler Preset in the background"
+    (
+      git clone https://github.com/ClownsharkBatwing/RES4LYF/
+      cd RES4LYF || exit 1
+      pip install -r requirements.txt
+      cd /
+      
+      # Download UNET from Hugging Face
+      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors --relative-path /workspace/ComfyUI/models/diffusion_models --set-hf-api-token $HF_API_TOKEN
+      
+      # Download CLIP from Hugging Face
+      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors --relative-path /workspace/ComfyUI/models/clip --set-hf-api-token $HF_API_TOKEN
+
+      # Download Upscaler from Hugging Face
+      comfy model download --url https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors --relative-path /workspace/ComfyUI/models/upscale_models --set-hf-api-token $HF_API_TOKEN
+      
+      # Download VAE from Hugging Face
+      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors --relative-path /workspace/ComfyUI/models/vae --set-hf-api-token $HF_API_TOKEN
+      
+      # Download LoRA from Hugging Face
+      comfy model download --url https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors --relative-path /workspace/ComfyUI/models/loras --set-hf-api-token $HF_API_TOKEN
+ 
+      # Rename LoRA to match workflow name
+      mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
+    ) &> /var/log/video_upscaler_setup.log &
+    
+    VIDEO_UPSCALER_PID=$!
+    echo "Video Upscaler setup started in background (PID: $VIDEO_UPSCALER_PID)"
+else
+    echo "PRESET_VIDEO_UPSCALER disabled, skipping Video Upscaler setup"
+    VIDEO_UPSCALER_PID=""
 fi
 
 # Copy workflows from ComfyUI-Distributed-Pod
@@ -134,17 +181,14 @@ comfyui:
 EOL
 fi
 
-# Create required model directories if they don't exist
-echo "Creating model directories..."
-mkdir -p /workspace/ComfyUI/models/checkpoints/
-mkdir -p /workspace/ComfyUI/models/clip/
-mkdir -p /workspace/ComfyUI/models/vae/
-mkdir -p /workspace/ComfyUI/models/controlnet/
-mkdir -p /workspace/ComfyUI/models/diffusion_models/
-mkdir -p /workspace/ComfyUI/models/unet/
-mkdir -p /workspace/ComfyUI/models/loras/
-mkdir -p /workspace/ComfyUI/models/clip_vision/
-mkdir -p /workspace/ComfyUI/models/upscale_models/
+# Wait for Video Upscaler setup to complete (only if it was started)
+if [ -n "$VIDEO_UPSCALER_PID" ]; then
+    while kill -0 "$VIDEO_UPSCALER_PID" 2>/dev/null; do
+        echo "Video Upscaler setup in progress..."
+        sleep 10
+    done
+    echo "Video Upscaler setup complete"
+fi
 
 # Wait for SageAttention build to complete (only if it was started)
 if [ -n "$BUILD_PID" ]; then
