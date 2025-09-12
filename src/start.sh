@@ -137,20 +137,25 @@ cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull
 echo "Updating KJNodes."
 cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull
 
-# ---------- Clean download helper (skip if present) ----------
-get_if_missing () {
-  # $1 = URL, $2 = DEST FILE
-  local url="$1" dest="$2"
+# Download a single file from a repo to an exact path (skip if present)
+hf_get () {
+  # $1=repo_id  $2=path_in_repo  $3=dest_file
+  local repo="$1" rel="$2" dest="$3"
   if [ -f "$dest" ]; then
     echo "Exists: $(basename "$dest")"
-  else
-    mkdir -p "$(dirname "$dest")"
-    hf download "$url" -o "$dest"
+    return 0
   fi
+  local stage_dir
+  stage_dir="$(dirname "$dest")/.hfstage"
+  mkdir -p "$stage_dir"
+  # Use hf_transfer via env; preserve progress output
+  hf download "$repo" --include "$rel" --revision main --local-dir "$stage_dir"
+  install -D "$stage_dir/$rel" "$dest"
+  rm -rf "$stage_dir"
 }
-# ------------------------------------------------------------
 
-# Video Upscaler preset + model downloads
+
+# Only prepare Video Upscaler Preset if enabled
 if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
   echo "Preparing Video Upscaler Preset"
   (
@@ -159,24 +164,24 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
     cd RES4LYF || exit 1
     pip install -r requirements.txt
 
-    # WAN 2.2 diffusion model (Comfy-Org)
-    get_if_missing \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
+    # WAN 2.2 diffusion model
+    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+      "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
       "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
 
-    # Text encoder (umt5_xxl_fp16.safetensors) -> /models/clip
-    get_if_missing \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors" \
+    # Text encoder -> /models/clip
+    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+      "split_files/text_encoders/umt5_xxl_fp16.safetensors" \
       "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors"
 
     # VAE -> /models/vae
-    get_if_missing \
-      "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" \
+    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+      "split_files/vae/wan_2.1_vae.safetensors" \
       "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors"
 
-    # LoRA (download, then rename)
-    get_if_missing \
-      "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
+    # LoRA -> /models/loras then rename
+    hf_get "lightx2v/Wan2.2-Lightning" \
+      "Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
       "/workspace/ComfyUI/models/loras/low_noise_model.safetensors"
 
     if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ] && \
@@ -188,12 +193,13 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
       echo "LoRA already renamed or not downloaded yet"
     fi
 
-    # Upscaler model -> /models/upscale_models
-    get_if_missing \
-      "https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors" \
+    # Upscaler -> /models/upscale_models
+    hf_get "Phips/4xNomos8kDAT" \
+      "4xNomos8kDAT.safetensors" \
       "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
   )
 fi
+
 
 # Wait for SageAttention (if building)
 if [ -n "${BUILD_PID:-}" ]; then
