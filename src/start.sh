@@ -22,7 +22,7 @@ fi
 
 # Enable Hugging Face hf_transfer for faster downloads via huggingface_hub
 export HF_HUB_ENABLE_HF_TRANSFER=1
-if ! python3 - <<'PY' 2>/dev/null; then
+if ! python3 - 2>/dev/null <<'PY'
 import importlib
 import sys
 import pkgutil
