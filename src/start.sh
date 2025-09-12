@@ -2,13 +2,13 @@
 set -euo pipefail
 
 echo "Speedy HF downloads: install + enable hf_transfer"
-# Install hub client + CLI with the hf_transfer extra (pulls the Rust helper)
-python3 -m pip install -U "huggingface_hub[cli,hf_transfer]" hf_transfer >/dev/null 2>&1 || true
+# Install the Hub + CLI and the Rust accelerator package
+python3 -m pip install -U "huggingface_hub[cli]" hf_transfer >/dev/null 2>&1 || true
 
-# Enable hf_transfer and make sure the client doesn't route via XET (which bypasses hf_transfer)
+# Enable the accelerator and force the LFS path (so xet doesn't bypass hf_transfer)
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
-export HF_DEBUG=1                     # verbose hub logs so you can SEE what's happening
+export HF_DEBUG=1
 export HF_HOME=/workspace/.cache/huggingface
 mkdir -p "${HF_HOME}"
 
@@ -18,14 +18,14 @@ if command -v huggingface-cli >/dev/null 2>&1 && [ -n "${HF_API_TOKEN:-}" ]; the
   huggingface-cli login --token "$HF_API_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
 fi
 
-# Self-check: print whether hf_transfer is both available and enabled
+# Self-check (no private imports): print hub version and whether hf_transfer is importable
 python3 - <<'PY'
-import os, importlib.util
-from huggingface_hub.file_download import _hf_transfer
-print(f"[hf_transfer] hub: available={_hf_transfer.is_available()} enabled={_hf_transfer.is_enabled()} "
-      f"(HF_HUB_ENABLE_HF_TRANSFER={os.getenv('HF_HUB_ENABLE_HF_TRANSFER')}, HF_HUB_DISABLE_XET={os.getenv('HF_HUB_DISABLE_XET')})")
-print(f"[hf_transfer] module present? {importlib.util.find_spec('hf_transfer') is not None}")
+import os, importlib.util, huggingface_hub
+have_xfer = importlib.util.find_spec("hf_transfer") is not None
+print(f"[hf] hub={huggingface_hub.__version__}  HF_HUB_ENABLE_HF_TRANSFER={os.getenv('HF_HUB_ENABLE_HF_TRANSFER')}  HF_HUB_DISABLE_XET={os.getenv('HF_HUB_DISABLE_XET')}")
+print(f"[hf] hf_transfer module present? {have_xfer}")
 PY
+
 
 # -----------------------------------------------------------------------------
 # Use libtcmalloc for better memory management
