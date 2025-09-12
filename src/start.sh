@@ -141,14 +141,27 @@ cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull
 hf_get () {
   # $1=repo_id  $2=path_in_repo  $3=dest_file
   local repo="$1" rel="$2" dest="$3"
-  [ -f "$dest" ] && { echo "Exists: $(basename "$dest")"; return; }
   local dest_dir; dest_dir="$(dirname "$dest")"
+
+  # Skip if already present
+  if [ -f "$dest" ]; then
+    echo "Exists: $(basename "$dest")"
+    return 0
+  fi
+
   mkdir -p "$dest_dir"
   HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$repo" \
     --include "$rel" --revision main --local-dir "$dest_dir"
-  mv -f "$dest_dir/$rel" "$dest"
-  # remove empty subdirs created by $rel (ignore errors if not empty)
-  rmdir -p "$(dirname "$dest_dir/$rel")" 2>/dev/null || true
+
+  local src="$dest_dir/$rel"
+  if [ "$src" != "$dest" ]; then
+    mkdir -p "$(dirname "$dest")"
+    mv -f "$src" "$dest"
+    # remove empty nested dirs created by $rel (ignore if not empty)
+    rmdir -p "$(dirname "$src")" 2>/dev/null || true
+  else
+    echo "Already at destination: $(basename "$dest")"
+  fi
 }
 
 # Only prepare Video Upscaler Preset if enabled
