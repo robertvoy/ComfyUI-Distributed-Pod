@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Environment Variables (optional):
+# - HF_API_TOKEN: Your HuggingFace API token for authenticated downloads
+# - PARALLEL_DOWNLOADS: Set to 'true' for parallel downloads (faster but less progress visibility)
+# - CLEAR_HF_CACHE: Set to 'true' to clear HF cache after downloads to save disk space
+# - SAGE_ATTENTION: Set to 'false' to disable SageAttention
+# - PRESET_VIDEO_UPSCALER: Set to 'false' to skip Video Upscaler preset
+
 # Use libtcmalloc for better memory management
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
