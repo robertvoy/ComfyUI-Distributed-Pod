@@ -1,20 +1,5 @@
 #!/usr/bin/env bash
 
-# --- Speedy HF downloads: install and enable hf_transfer ---------------------
-# (Done early so any HF downloads benefit.)
-echo "Speedy HF downloads: install and enable hf_transfer"
-pip install -U "huggingface_hub[cli]" hf_transfer >/dev/null 2>&1 || true
-export HF_HUB_ENABLE_HF_TRANSFER=1
-# Optional: keep cache in a predictable place
-export HF_HOME=/workspace/.cache/huggingface
-mkdir -p "${HF_HOME}"
-
-# Login non-interactively if token provided
-if [ -n "${HF_API_TOKEN:-}" ]; then
-  huggingface-cli login --token "$HF_API_TOKEN" --add-to-git-credential >/dev/null 2>&1 || true
-fi
-# ------------------------------------------------------------------------------
-
 # Use libtcmalloc for better memory management
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
@@ -28,6 +13,7 @@ else
     echo "additional_params.sh not found in /workspace. Skipping..."
 fi
 
+# Install aria2 if needed (still useful for non-HF downloads)
 if ! which aria2 > /dev/null 2>&1; then
     echo "Installing aria2..."
     apt-get update && apt-get install -y aria2
@@ -35,12 +21,45 @@ else
     echo "aria2 is already installed"
 fi
 
+# Install curl if needed
 if ! which curl > /dev/null 2>&1; then
     echo "Installing curl..."
     apt-get update && apt-get install -y curl
 else
     echo "curl is already installed"
 fi
+
+# ===== NEW: Install HuggingFace CLI and hf_transfer for blazing fast downloads =====
+echo "Setting up HuggingFace fast download tools..."
+if ! pip show huggingface-hub > /dev/null 2>&1; then
+    echo "Installing HuggingFace CLI..."
+    pip install -U "huggingface_hub[cli]"
+else
+    echo "HuggingFace CLI already installed"
+fi
+
+if ! pip show hf_transfer > /dev/null 2>&1; then
+    echo "Installing hf_transfer for blazingly fast speeds..."
+    pip install hf_transfer
+else
+    echo "hf_transfer already installed"
+fi
+
+# Enable HF Transfer for all HuggingFace downloads
+export HF_HUB_ENABLE_HF_TRANSFER=1
+echo "HF_TRANSFER enabled for maximum download speeds"
+
+# Optional: Login to HuggingFace (comment out if not needed or using public models only)
+# You can set HF_API_TOKEN environment variable instead of interactive login
+if [ -n "$HF_API_TOKEN" ]; then
+    echo "Logging into HuggingFace with provided token..."
+    huggingface-cli login --token "$HF_API_TOKEN" --add-to-git-credential
+elif [ -f ~/.cache/huggingface/token ]; then
+    echo "HuggingFace token already exists"
+else
+    echo "No HF_API_TOKEN found. Continuing without login (public models only)..."
+fi
+# ===== END NEW SECTION =====
 
 URL="http://127.0.0.1:8188"
 COMFYUI_DIR="/ComfyUI"
@@ -90,73 +109,6 @@ mkdir -p /workspace/ComfyUI/models/unet/
 mkdir -p /workspace/ComfyUI/models/loras/
 mkdir -p /workspace/ComfyUI/models/clip_vision/
 mkdir -p /workspace/ComfyUI/models/upscale_models/
-mkdir -p /workspace/ComfyUI/models/text_encoders/
-
-# ---------- Helpers for fast HF downloads with fallback to aria2 -------------
-# Parse a huggingface.co "resolve" URL into REPO and INCLUDE path.
-_parse_hf_url() {
-  # $1 = full URL
-  # outputs: "repo_id include_path"
-  local url="$1"
-  local repo include
-  repo="$(echo "$url" | sed -E 's#https?://huggingface\.co/([^/]+/[^/]+)/.*#\1#')"
-  include="$(echo "$url" | sed -E 's#https?://huggingface\.co/[^/]+/[^/]+/resolve/[^/]+/(.*)#\1#')"
-  echo "$repo" "$include"
-}
-
-# Try to download a single HF file using hf_transfer (via huggingface-cli).
-_hf_transfer_download() {
-  # $1=url  $2=dest_dir  $3=dest_name (optional)
-  local url="$1" dest_dir="$2" dest_name="$3"
-  if ! command -v huggingface-cli >/dev/null 2>&1; then
-    return 1
-  fi
-  read -r repo include <<< "$(_parse_hf_url "$url")"
-  if [ -z "$repo" ] || [ -z "$include" ]; then
-    return 1
-  fi
-
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  # Use hf_transfer by setting env var; avoid symlinks so we can move files cleanly
-  HF_HUB_ENABLE_HF_TRANSFER=1 huggingface-cli download "$repo" \
-    --include "$include" \
-    --revision main \
-    --repo-type model \
-    --local-dir "$tmpdir" \
-    --local-dir-use-symlinks False >/dev/null 2>&1
-
-  local src="$tmpdir/$include"
-  if [ -f "$src" ]; then
-    mkdir -p "$dest_dir"
-    if [ -n "$dest_name" ]; then
-      mv -f "$src" "$dest_dir/$dest_name"
-    else
-      mv -f "$src" "$dest_dir/"
-    fi
-    rm -rf "$tmpdir"
-    echo "Downloaded via hf_transfer: $repo :: $include -> $dest_dir/${dest_name:-$(basename "$src")}"
-    return 0
-  else
-    rm -rf "$tmpdir"
-    return 1
-  fi
-}
-
-# Unified downloader: prefer hf_transfer; fallback to aria2c
-fast_get() {
-  # $1=url  $2=dest_dir  $3=dest_name (optional)
-  local url="$1" dest_dir="$2" dest_name="$3"
-
-  if _hf_transfer_download "$url" "$dest_dir" "$dest_name"; then
-    return 0
-  fi
-
-  echo "hf_transfer unavailable/failed for $url — falling back to aria2c"
-  mkdir -p "$dest_dir"
-  aria2c -x 16 -s 16 -j 4 -d "$dest_dir" ${dest_name:+-o "$dest_name"} "$url"
-}
-# ------------------------------------------------------------------------------
 
 # Only build SageAttention if sage_attention are enabled
 if [ "$SAGE_ATTENTION" != "false" ]; then
@@ -181,41 +133,68 @@ if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
     echo "Preparing Video Upscaler Preset in the background"
     (
       cd /ComfyUI/custom_nodes/
-      git clone https://github.com/ClownsharkBatwing/RES4LYF/ || true
+      git clone https://github.com/ClownsharkBatwing/RES4LYF/
       cd RES4LYF || exit 1
       pip install -r requirements.txt
-
-      echo "Starting fast HF downloads for Video Upscaler models..."
-      # 1) Diffusion model
-      fast_get "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
-               "/workspace/ComfyUI/models/diffusion_models" "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
-
-      # 2) Text encoder (goes under text_encoders in your mapping; original path said clip)
-      fast_get "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors" \
-               "/workspace/ComfyUI/models/text_encoders" "umt5_xxl_fp16.safetensors"
-
-      # 3) VAE
-      fast_get "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" \
-               "/workspace/ComfyUI/models/vae" "wan_2.1_vae.safetensors"
-
-      # 4) LoRA
-      fast_get "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
-               "/workspace/ComfyUI/models/loras" "low_noise_model.safetensors"
-
-      # 5) Upscaler
-      fast_get "https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors" \
-               "/workspace/ComfyUI/models/upscale_models" "4xNomos8kDAT.safetensors"
-
-      # Rename LoRA
-      if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ]; then
-        mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
-           /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
-        echo "LoRA renamed successfully"
-      fi
-
+      
+      # ===== UPDATED: Using HF Transfer for HuggingFace downloads =====
+      echo "Starting parallel downloads of Video Upscaler models using HF Transfer..."
+      
+      # Function to download HF model with progress tracking
+      download_hf_model() {
+          local repo_id="$1"
+          local filename="$2"
+          local target_dir="$3"
+          local output_name="${4:-$filename}"
+          
+          echo "Downloading $filename from $repo_id..."
+          # Download to temp location first
+          HF_HUB_ENABLE_HF_TRANSFER=1 huggingface-cli download "$repo_id" "$filename" \
+              --local-dir-use-symlinks False \
+              --local-dir "/tmp/hf_downloads"
+          
+          # Move to target location with proper name
+          mkdir -p "$target_dir"
+          mv "/tmp/hf_downloads/$filename" "$target_dir/$output_name"
+          echo "Downloaded $output_name to $target_dir"
+      }
+      
+      # Download all models in parallel using background processes
+      download_hf_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+          "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
+          "/workspace/ComfyUI/models/diffusion_models" \
+          "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" &
+      
+      download_hf_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+          "split_files/text_encoders/umt5_xxl_fp16.safetensors" \
+          "/workspace/ComfyUI/models/clip" \
+          "umt5_xxl_fp16.safetensors" &
+      
+      download_hf_model "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+          "split_files/vae/wan_2.1_vae.safetensors" \
+          "/workspace/ComfyUI/models/vae" \
+          "wan_2.1_vae.safetensors" &
+      
+      download_hf_model "lightx2v/Wan2.2-Lightning" \
+          "Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
+          "/workspace/ComfyUI/models/loras" \
+          "Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors" &
+      
+      download_hf_model "Phips/4xNomos8kDAT" \
+          "4xNomos8kDAT.safetensors" \
+          "/workspace/ComfyUI/models/upscale_models" \
+          "4xNomos8kDAT.safetensors" &
+      
+      # Wait for all background downloads to complete
+      wait
+      echo "All Video Upscaler models downloaded successfully"
+      
+      # Clean up temp directory
+      rm -rf /tmp/hf_downloads
+      
       echo "Video Upscaler setup completed"
     ) &> /var/log/video_upscaler_setup.log &
-
+    
     VIDEO_UPSCALER_PID=$!
     echo "Video Upscaler setup started in background (PID: $VIDEO_UPSCALER_PID)"
 else
@@ -280,10 +259,6 @@ cd /ComfyUI/
 git pull
 pip install -r /ComfyUI/requirements.txt
 
-# (Re)ensure fast HF bits remain installed even if requirements touched versions
-python3 -m pip install -U "huggingface_hub[cli]" hf_transfer >/dev/null 2>&1 || true
-export HF_HUB_ENABLE_HF_TRANSFER=1
-
 # Update ComfyUI-Distributed
 echo "Updating ComfyUI-Distributed."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed/
@@ -299,36 +274,14 @@ echo "Updating KJNodes."
 cd /ComfyUI/custom_nodes/ComfyUI-KJNodes/
 git pull
 
-# Function to monitor download progress (kept for the background tasks)
-monitor_download_progress() {
-    local pid=$1
-    local name=$2
-    local log_file=$3
-    local last_progress=""
-
-    while kill -0 "$pid" 2>/dev/null; do
-        if [ -f "$log_file" ]; then
-            current_progress=$(grep -E "(\[[#\.]+\]|Download complete:|ERROR|SEED)" "$log_file" | tail -1)
-            if [ "$current_progress" != "$last_progress" ] && [ -n "$current_progress" ]; then
-                echo "$name: $current_progress"
-                last_progress="$current_progress"
-            fi
-        fi
-        sleep 5
-    done
-
-    if [ -f "$log_file" ]; then
-        if grep -q "ERROR" "$log_file"; then
-            echo "$name: Completed with errors. Check $log_file for details."
-        else
-            echo "$name: Complete"
-        fi
-    fi
-}
-
+# Simplified monitoring for HF downloads
 if [ -n "$VIDEO_UPSCALER_PID" ]; then
     echo "Waiting for Video Upscaler downloads to complete..."
-    monitor_download_progress "$VIDEO_UPSCALER_PID" "Video Upscaler" "/var/log/video_upscaler_setup.log"
+    while kill -0 "$VIDEO_UPSCALER_PID" 2>/dev/null; do
+        echo "Video Upscaler setup in progress..."
+        sleep 10
+    done
+    echo "Video Upscaler setup complete"
 fi
 
 if [ -n "$BUILD_PID" ]; then
