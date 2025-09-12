@@ -106,20 +106,24 @@ if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
       # Create aria2 input file for parallel downloads
       cat > /tmp/video_upscaler_downloads.txt << 'EOF'
 https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
-dir=/workspace/ComfyUI/models/diffusion_models
-out=wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
+ dir=/workspace/ComfyUI/models/diffusion_models
+ out=wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors
 
 https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors
-dir=/workspace/ComfyUI/models/clip
-out=umt5_xxl_fp16.safetensors
+ dir=/workspace/ComfyUI/models/clip
+ out=umt5_xxl_fp16.safetensors
 
 https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
-dir=/workspace/ComfyUI/models/vae
-out=wan_2.1_vae.safetensors
+ dir=/workspace/ComfyUI/models/vae
+ out=wan_2.1_vae.safetensors
 
 https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors
-dir=/workspace/ComfyUI/models/loras
-out=low_noise_model.safetensors
+ dir=/workspace/ComfyUI/models/loras
+ out=low_noise_model.safetensors
+
+https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors
+ dir=/workspace/ComfyUI/models/upscale_models
+ out=4xNomos8kDAT.safetensors
       EOF
       
       echo "Starting parallel downloads of Video Upscaler models..."
