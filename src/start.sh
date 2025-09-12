@@ -98,28 +98,38 @@ fi
 if [ "$PRESET_VIDEO_UPSCALER" != "false" ]; then
     echo "Preparing Video Upscaler Preset in the background"
     (
+      cd /ComfyUI/custom_nodes/
       git clone https://github.com/ClownsharkBatwing/RES4LYF/
       cd RES4LYF || exit 1
       pip install -r requirements.txt
-      cd /
       
-      # Download UNET from Hugging Face
-      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors --relative-path /workspace/ComfyUI/models/diffusion_models --set-hf-api-token $HF_API_TOKEN
+      # Use aria2c for faster parallel downloads
+      echo "Downloading UNET model..."
+      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/diffusion_models/ \
+        -o wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
       
-      # Download CLIP from Hugging Face
-      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors --relative-path /workspace/ComfyUI/models/clip --set-hf-api-token $HF_API_TOKEN
-
-      # Download Upscaler from Hugging Face
-      comfy model download --url https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors --relative-path /workspace/ComfyUI/models/upscale_models --set-hf-api-token $HF_API_TOKEN
+      echo "Downloading CLIP model..."
+      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/clip/ \
+        -o umt5_xxl_fp16.safetensors \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors"
       
-      # Download VAE from Hugging Face
-      comfy model download --url https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors --relative-path /workspace/ComfyUI/models/vae --set-hf-api-token $HF_API_TOKEN
+      echo "Downloading VAE model..."
+      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/vae/ \
+        -o wan_2.1_vae.safetensors \
+        "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
       
-      # Download LoRA from Hugging Face
-      comfy model download --url https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors --relative-path /workspace/ComfyUI/models/loras --set-hf-api-token $HF_API_TOKEN
- 
+      echo "Downloading LoRA model..."
+      aria2c -x 16 -s 16 -k 1M -d /workspace/ComfyUI/models/loras/ \
+        -o low_noise_model.safetensors \
+        "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors"
+      
       # Rename LoRA to match workflow name
-      mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
+      if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ]; then
+        mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
+           /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
+        echo "LoRA renamed successfully"
+      fi
     ) &> /var/log/video_upscaler_setup.log &
     
     VIDEO_UPSCALER_PID=$!
