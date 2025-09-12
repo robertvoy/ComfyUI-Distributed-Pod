@@ -124,12 +124,13 @@ https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4s
 https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors
  dir=/workspace/ComfyUI/models/upscale_models
  out=4xNomos8kDAT.safetensors
-      EOF
+EOF
       
       echo "Starting parallel downloads of Video Upscaler models..."
-      # Run aria2c with parallel downloads and progress reporting
-      aria2c -x 16 -s 16 -j 4 --console-log-level=notice --summary-interval=10 \
-             --input-file=/tmp/video_upscaler_downloads.txt
+      # Run aria2c with visible progress (using tee to both show and log)
+      aria2c -x 16 -s 16 -j 5 --console-log-level=notice --summary-interval=5 \
+             --show-console-readout=true --human-readable=true \
+             --input-file=/tmp/video_upscaler_downloads.txt 2>&1 | tee /var/log/video_upscaler_setup.log
       
       # Rename LoRA
       if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ]; then
@@ -139,7 +140,7 @@ https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors
       fi
       
       echo "Video Upscaler setup completed"
-    ) &> /var/log/video_upscaler_setup.log &
+    ) &
     
     VIDEO_UPSCALER_PID=$!
     echo "Video Upscaler setup started in background (PID: $VIDEO_UPSCALER_PID)"
