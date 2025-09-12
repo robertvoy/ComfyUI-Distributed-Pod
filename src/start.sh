@@ -124,7 +124,7 @@ https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4s
 https://huggingface.co/Phips/4xNomos8kDAT/resolve/main/4xNomos8kDAT.safetensors
  dir=/workspace/ComfyUI/models/upscale_models
  out=4xNomos8kDAT.safetensors
-      EOF
+EOF
       
       echo "Starting parallel downloads of Video Upscaler models..."
       # Run aria2c with parallel downloads and progress reporting
