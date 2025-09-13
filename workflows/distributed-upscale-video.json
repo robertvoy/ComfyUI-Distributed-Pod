@@ -919,7 +919,7 @@
       },
       "widgets_values": [
         "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
-        "fp8_e4m3fn"
+        "default"
       ]
     }
   ],
