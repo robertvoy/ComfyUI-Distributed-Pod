@@ -188,19 +188,10 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
       "split_files/vae/wan_2.1_vae.safetensors" \
       "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors"
 
-    # LoRA -> /models/loras then rename
-    hf_get "lightx2v/Wan2.2-Lightning" \
-      "Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/low_noise_model.safetensors" \
-      "/workspace/ComfyUI/models/loras/low_noise_model.safetensors"
-
-    if [ -f "/workspace/ComfyUI/models/loras/low_noise_model.safetensors" ] && \
-       [ ! -f "/workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors" ]; then
-      mv /workspace/ComfyUI/models/loras/low_noise_model.safetensors \
-         /workspace/ComfyUI/models/loras/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1_low_noise_model.safetensors
-      echo "LoRA renamed successfully"
-    else
-      echo "LoRA already renamed or not downloaded yet"
-    fi
+    # LoRA -> /models/loras
+    hf_get "Kijai/WanVideo_comfy" \
+      "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" \
+      "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors"
 
     # Upscaler -> /models/upscale_models
     hf_get "Phips/4xNomos8kDAT" \
@@ -208,7 +199,6 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
       "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
   )
 fi
-
 
 # Wait for SageAttention (if building)
 if [ -n "${BUILD_PID:-}" ]; then
