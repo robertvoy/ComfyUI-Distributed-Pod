@@ -878,7 +878,7 @@
         "Node name for S&R": "UpscaleModelLoader"
       },
       "widgets_values": [
-        "4xNomos8kDAT.safetensors"
+        "RealESRGAN_x2.pth"
       ]
     },
     {
