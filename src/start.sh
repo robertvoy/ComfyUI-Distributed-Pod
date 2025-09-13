@@ -197,6 +197,11 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
     hf_get "Phips/4xNomos8kDAT" \
       "4xNomos8kDAT.safetensors" \
       "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
+      
+    # Upscaler 2 -> /models/upscale_models
+    hf_get "ai-forever/Real-ESRGAN" \
+      "RealESRGAN_x2.pth" \
+      "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
   )
 fi
 
