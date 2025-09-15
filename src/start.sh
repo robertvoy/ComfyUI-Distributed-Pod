@@ -205,6 +205,71 @@ if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
   )
 fi
 
+# Install Nunchaku if enabled
+if [ "${NUNCHAKU:-true}" != "false" ]; then
+  echo "Installing Nunchaku"
+  (
+    set -e
+    
+    # Clone the ComfyUI-nunchaku repository
+    cd /ComfyUI/custom_nodes
+    if [ ! -d "ComfyUI-nunchaku" ]; then
+      git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/
+      echo "ComfyUI-nunchaku cloned successfully"
+    else
+      echo "ComfyUI-nunchaku already exists, updating..."
+      cd ComfyUI-nunchaku && git pull
+    fi
+    
+    # Detect PyTorch version
+    TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
+    echo "Detected PyTorch version: ${TORCH_VERSION}"
+    
+    # Function to check if URL exists
+    check_url() {
+      curl --head --silent --fail "$1" > /dev/null 2>&1
+    }
+    
+    # Base URL and construct wheel URL
+    WHEEL_BASE_URL="https://github.com/nunchaku-tech/nunchaku/releases/download/v1.0.0"
+    WHEEL_NAME="nunchaku-1.0.0+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
+    WHEEL_URL="${WHEEL_BASE_URL}/${WHEEL_NAME}"
+    
+    # Check if wheel exists for detected version
+    echo "Checking for Nunchaku wheel for PyTorch ${TORCH_VERSION}..."
+    if check_url "${WHEEL_URL}"; then
+      echo "Found wheel for PyTorch ${TORCH_VERSION}, installing..."
+      pip install "${WHEEL_URL}"
+      echo "Nunchaku installation successful"
+    else
+      # Try common fallback versions in order
+      echo "No wheel found for PyTorch ${TORCH_VERSION}, trying fallback versions..."
+      FALLBACK_VERSIONS="2.8 2.7 2.6 2.5 2.4 2.3"
+      
+      INSTALLED=false
+      for VERSION in ${FALLBACK_VERSIONS}; do
+        FALLBACK_URL="${WHEEL_BASE_URL}/nunchaku-1.0.0+torch${VERSION}-cp312-cp312-linux_x86_64.whl"
+        if check_url "${FALLBACK_URL}"; then
+          echo "Found fallback wheel for PyTorch ${VERSION}, installing..."
+          pip install "${FALLBACK_URL}"
+          echo "Nunchaku installed using PyTorch ${VERSION} wheel (fallback)"
+          INSTALLED=true
+          break
+        fi
+      done
+      
+      if [ "${INSTALLED}" = false ]; then
+        echo "ERROR: Could not find compatible Nunchaku wheel. Please check available versions."
+        exit 1
+      fi
+    fi
+    
+    echo "Nunchaku installation complete"
+  )
+else
+  echo "Nunchaku disabled, skipping installation"
+fi
+
 # Wait for SageAttention (if building)
 if [ -n "${BUILD_PID:-}" ]; then
   echo "Waiting for SageAttention build to complete..."
