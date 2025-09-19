@@ -133,9 +133,9 @@ cd /ComfyUI && git pull && pip install -r requirements.txt
 echo "Updating ComfyUI-Distributed."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git pull
 echo "Updating WanVideoWrapper."
-cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull
+cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt
 echo "Updating KJNodes."
-cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull
+cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt
 
 # Download a single file from a repo to an exact path (skip if present)
 hf_get () {
