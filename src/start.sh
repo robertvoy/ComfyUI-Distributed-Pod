@@ -231,7 +231,7 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
     }
     
     # Base URL and construct wheel URL
-    WHEEL_VERSION="1.0.1"
+    WHEEL_VERSION="1.1.0"
     WHEEL_BASE_URL="https://github.com/nunchaku-tech/nunchaku/releases/download/v${WHEEL_VERSION}"
     WHEEL_NAME="nunchaku-${WHEEL_VERSION}+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
     WHEEL_URL="${WHEEL_BASE_URL}/${WHEEL_NAME}"
