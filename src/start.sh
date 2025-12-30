@@ -5,91 +5,70 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-python3 -m pip install -U "huggingface_hub[cli]" hf_transfer
+# FORCE REINSTALL compatible huggingface_hub
+python3 -m pip install "huggingface_hub<1.0" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
-# export HF_DEBUG=1
 [ -n "${HF_API_TOKEN:-}" ] && hf auth login --token "$HF_API_TOKEN" || true
 
-# Optional user hook
+# User Hook
 if [ -f "/workspace/additional_params.sh" ]; then
   chmod +x /workspace/additional_params.sh
-  echo "Executing additional_params.sh..."
   /workspace/additional_params.sh
-else
-  echo "additional_params.sh not found in /workspace. Skipping..."
 fi
 
-# ---------------------------------------------------------------------------
-# OPTIMIZATION 1: Consolidated apt-get calls
-# ---------------------------------------------------------------------------
+# Install dependencies
 PACKAGES=""
 if ! which aria2 >/dev/null 2>&1; then PACKAGES="$PACKAGES aria2"; fi
 if ! which curl >/dev/null 2>&1; then PACKAGES="$PACKAGES curl"; fi
+if ! which tail >/dev/null 2>&1; then PACKAGES="$PACKAGES coreutils"; fi
 if ! dpkg -s bash-completion >/dev/null 2>&1; then PACKAGES="$PACKAGES bash-completion"; fi
 
 if [ -n "$PACKAGES" ]; then
   echo "Installing missing packages: $PACKAGES"
+  dpkg --configure -a || true
   apt-get update && apt-get install -y $PACKAGES
-else
-  echo "All system dependencies already installed."
 fi
 
 URL="http://127.0.0.1:8188"
 COMFYUI_DIR="/ComfyUI"
 WORKFLOW_DIR="/ComfyUI/user/default/workflows"
 
-export SHELL=/bin/bash
-
-# Basic .bashrc for interactive shells
-if [ ! -f /root/.bashrc ]; then
-  cat <<'EOF' > /root/.bashrc
-[ -z "$PS1" ] && return
-PS1='\u@\h:\w\# '
-if [ -f /etc/bash_completion ] && ! shopt -oq posix; then . /etc/bash_completion; fi
-EOF
-  echo ".bashrc created for root."
+# Start Jupyter (Background, not tracked by wait)
+if ! pgrep -f "jupyter-lab" > /dev/null; then
+  jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 fi
 
-echo "Starting JupyterLab on root directory..."
-jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
-
-# Model folders
-echo "Creating model directories..."
+# Directories
 mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models}
 
-# Build SageAttention if enabled
+# SageAttention Build (Background - Tracked separately)
 if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
-  echo "Building SageAttention in the background"
-  (
-    set -e
-    git clone https://github.com/thu-ml/SageAttention.git || true
-    cd SageAttention
-    python3 setup.py install
-    pip install --no-cache-dir triton
-  ) &> /var/log/sage_build.log &
-  BUILD_PID=$!
-  echo "Background build started (PID: $BUILD_PID)"
+  if [ ! -d "SageAttention" ]; then
+      echo "Starting SageAttention build in background..."
+      (
+        set -e
+        git clone https://github.com/thu-ml/SageAttention.git || true
+        cd SageAttention
+        python3 setup.py install
+        pip install --no-cache-dir triton
+      ) &> /var/log/sage_build.log &
+      BUILD_PID=$!
+  else
+      BUILD_PID=""
+  fi
 else
-  echo "sage_attention disabled, skipping SageAttention build"
   BUILD_PID=""
 fi
 
-# Copy workflows
+# Copy workflows & Configs
 mkdir -p "$WORKFLOW_DIR"
-SOURCE_WORKFLOW_DIR="/ComfyUI-Distributed-Pod/workflows"
-if [ -d "$SOURCE_WORKFLOW_DIR" ]; then
-  cp -r "$SOURCE_WORKFLOW_DIR/"* "$WORKFLOW_DIR/"
-  echo "Workflows copied successfully."
-else
-  echo "Workflow source directory not found: $SOURCE_WORKFLOW_DIR"
+if [ -d "/ComfyUI-Distributed-Pod/workflows" ]; then
+  cp -r "/ComfyUI-Distributed-Pod/workflows/"* "$WORKFLOW_DIR/"
 fi
 
-# extra_model_paths.yaml
-SOURCE_YAML="/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml"
-if [ -f "$SOURCE_YAML" ]; then
-  cp "$SOURCE_YAML" "$COMFYUI_DIR/extra_model_paths.yaml"
-  echo "extra_model_paths.yaml copied successfully."
+if [ -f "/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml" ]; then
+  cp "/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml" "$COMFYUI_DIR/extra_model_paths.yaml"
 else
   cat > "$COMFYUI_DIR/extra_model_paths.yaml" <<'EOL'
 comfyui:
@@ -126,171 +105,158 @@ comfyui:
 EOL
 fi
 
-# Update ComfyUI + nodes
+# Update ComfyUI & Standard Nodes
 echo "Updating ComfyUI..."
 cd /ComfyUI && git pull && pip install -r requirements.txt
 
-echo "Updating ComfyUI-Distributed..."
+echo "Updating Custom Nodes..."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed
-# Branch switching logic
-TARGET_BRANCH="${DISTRIBUTED_BRANCH:-main}"
-echo "Switching ComfyUI-Distributed to branch: $TARGET_BRANCH"
 git fetch origin
-git checkout "$TARGET_BRANCH"
-git pull origin "$TARGET_BRANCH"
+git checkout "${DISTRIBUTED_BRANCH:-main}"
+git pull origin "${DISTRIBUTED_BRANCH:-main}"
 
-echo "Updating WanVideoWrapper..."
 cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt
-echo "Updating KJNodes..."
 cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt
 
-# Download a single file from a repo to an exact path (skip if present)
-hf_get () {
-  # $1=repo_id  $2=path_in_repo  $3=dest_file
+# Install Crystools
+echo "Installing Crystools..."
+cd /ComfyUI/custom_nodes
+if [ ! -d "comfyui-crystools" ]; then
+    git clone https://github.com/crystian/comfyui-crystools.git
+else
+    cd comfyui-crystools && git pull
+fi
+cd /ComfyUI/custom_nodes/comfyui-crystools && pip install -r requirements.txt
+
+# Aria2 Function
+hf_get() {
   local repo="$1" rel="$2" dest="$3"
   local dest_dir; dest_dir="$(dirname "$dest")"
+  local filename; filename="$(basename "$dest")"
 
-  # Skip if already present
   if [ -f "$dest" ]; then
-    echo "Exists: $(basename "$dest")"
+    echo "Exists: $filename"
     return 0
   fi
 
   mkdir -p "$dest_dir"
-  # Quietly download in background
-  HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$repo" \
-    --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
-
-  local src="$dest_dir/$rel"
-  if [ "$src" != "$dest" ]; then
-    mkdir -p "$(dirname "$dest")"
-    mv -f "$src" "$dest"
-    rmdir -p "$(dirname "$src")" 2>/dev/null || true
+  local url="https://huggingface.co/${repo}/resolve/main/${rel}"
+  
+  if command -v aria2c &> /dev/null; then
+    echo "aria2c downloading: $filename"
+    aria2c --console-log-level=error --summary-interval=5 -c -x 8 -s 8 -k 1M "$url" -d "$dest_dir" -o "$filename"
   else
-    echo "Downloaded: $(basename "$dest")"
+    HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
+    local src="$dest_dir/$rel"
+    [ "$src" != "$dest" ] && [ -f "$src" ] && mv -f "$src" "$dest" && rmdir -p "$(dirname "$src")" 2>/dev/null || true
   fi
 }
 
 # ---------------------------------------------------------------------------
-# PRESET 1: VIDEO UPSCALER (Wan 2.2 T2V + Upscalers)
+# PRESET 1: VIDEO UPSCALER
 # ---------------------------------------------------------------------------
 if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
-  echo "Preparing Video Upscaler Preset (Parallel)..."
+  echo "Preparing Video Upscaler Preset..."
+  PIDS=""
   
-  # Install Custom Node
-  (
-    cd /ComfyUI/custom_nodes/
-    if [ ! -d "RES4LYF" ]; then git clone https://github.com/ClownsharkBatwing/RES4LYF/; fi
-    cd RES4LYF && pip install -r requirements.txt
-  ) &
+  ( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF/; } && cd RES4LYF && pip install -r requirements.txt ) &
+  PIDS="$PIDS $!"
 
-  # Wan T2V Model
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" ) &
-
-  # Shared: T5 Text Encoder
+  PIDS="$PIDS $!"
+  
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" ) &
-
-  # Shared: VAE
+  PIDS="$PIDS $!"
+  
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" ) &
-
-  # LoRA
+  PIDS="$PIDS $!"
+  
   ( hf_get "Kijai/WanVideo_comfy" "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" ) &
-
-  # Upscalers
+  PIDS="$PIDS $!"
+  
   (
     hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
     hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
   ) &
-
-  wait
+  PIDS="$PIDS $!"
+  
+  # IMPORTANT: Wait ONLY for these PIDs, not Jupyter
+  wait $PIDS
   echo "Video Upscaler Preset: Complete."
 fi
 
 # ---------------------------------------------------------------------------
-# PRESET 2: WAN 2.2 FP16 I2V (High Quality Image-to-Video)
+# PRESET 2: WAN 2.2 FP16 I2V
 # ---------------------------------------------------------------------------
 if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
-  echo "Preparing Wan 2.2 FP16 I2V Preset (Parallel)..."
+  echo "Preparing Wan 2.2 FP16 I2V Preset..."
+  PIDS=""
 
-  # Shared: T5 Text Encoder (Skips if downloaded by Preset 1)
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" ) &
-
-  # Shared: VAE (Skips if downloaded by Preset 1)
+  PIDS="$PIDS $!"
+  
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" ) &
-
-  # I2V Low Noise Model (FP16)
+  PIDS="$PIDS $!"
+  
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" ) &
-
-  # I2V High Noise Model (FP16)
+  PIDS="$PIDS $!"
+  
   ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" ) &
-
-  # Distilled LoRAs (Grouped to avoid race conditions on same repo)
+  PIDS="$PIDS $!"
+  
   (
     hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
     hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
   ) &
+  PIDS="$PIDS $!"
 
-  wait
+  # IMPORTANT: Wait ONLY for these PIDs, not Jupyter
+  wait $PIDS
   echo "Wan 2.2 FP16 I2V Preset: Complete."
 fi
 
-# Install Nunchaku if enabled
+# Nunchaku
 if [ "${NUNCHAKU:-true}" != "false" ]; then
-  echo "Installing Nunchaku"
+  echo "Installing Nunchaku..."
   (
     set -e
-    
     cd /ComfyUI/custom_nodes
-    if [ ! -d "ComfyUI-nunchaku" ]; then
-      git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/
-    else
-      cd ComfyUI-nunchaku && git pull
-    fi
+    [ ! -d "ComfyUI-nunchaku" ] && git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/ || (cd ComfyUI-nunchaku && git pull)
     
     TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
     check_url() { curl --head --silent --fail "$1" > /dev/null 2>&1; }
     
-    WHEEL_VERSION="1.1.0"
-    WHEEL_BASE_URL="https://github.com/nunchaku-tech/nunchaku/releases/download/v${WHEEL_VERSION}"
-    WHEEL_NAME="nunchaku-${WHEEL_VERSION}+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
-    WHEEL_URL="${WHEEL_BASE_URL}/${WHEEL_NAME}"
+    WHEEL_BASE="https://github.com/nunchaku-tech/nunchaku/releases/download/v1.1.0"
+    WHEEL_URL="${WHEEL_BASE}/nunchaku-1.1.0+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
     
     if check_url "${WHEEL_URL}"; then
       pip install "${WHEEL_URL}"
     else
-      FALLBACK_VERSIONS="2.8 2.7 2.6 2.5 2.4 2.3"
-      INSTALLED=false
-      for VERSION in ${FALLBACK_VERSIONS}; do
-        FALLBACK_URL="${WHEEL_BASE_URL}/nunchaku-1.0.0+torch${VERSION}-cp312-cp312-linux_x86_64.whl"
-        if check_url "${FALLBACK_URL}"; then
-          pip install "${FALLBACK_URL}"
-          INSTALLED=true
-          break
-        fi
+      for VER in 2.8 2.7 2.6 2.5 2.4 2.3; do
+        FB_URL="${WHEEL_BASE}/nunchaku-1.0.0+torch${VER}-cp312-cp312-linux_x86_64.whl"
+        if check_url "${FB_URL}"; then pip install "${FB_URL}"; break; fi
       done
-      if [ "${INSTALLED}" = false ]; then echo "ERROR: No Nunchaku wheel found."; exit 1; fi
     fi
   )
 fi
 
-# Wait for SageAttention (if building)
+# Wait for SageAttention Build
 if [ -n "${BUILD_PID:-}" ]; then
-  echo "Waiting for SageAttention build..."
-  while kill -0 "$BUILD_PID" 2>/dev/null; do
-    sleep 10
-  done
+  if kill -0 "$BUILD_PID" 2>/dev/null; then
+      echo "----------------------------------------------------------------"
+      echo "Waiting for SageAttention build (streaming logs)..."
+      echo "----------------------------------------------------------------"
+      tail -f /var/log/sage_build.log --pid=$BUILD_PID
+  fi
 fi
 
-# Start ComfyUI
-echo "Launching ComfyUI"
-ARGS="--listen --enable-cors-header"
-[ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
+# Launch
+if ! pgrep -f "main.py --listen" > /dev/null; then
+  echo "Launching ComfyUI"
+  ARGS="--listen --enable-cors-header"
+  [ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
+  nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
+fi
 
-nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
-
-until curl --silent --fail "$URL" --output /dev/null; do
-  echo "Launching ComfyUI..."
-  sleep 2
-done
 echo "ComfyUI is ready"
 sleep infinity
