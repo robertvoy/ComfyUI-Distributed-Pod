@@ -5,8 +5,10 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-# FORCE REINSTALL compatible huggingface_hub
-python3 -m pip install "huggingface_hub<1.0" hf_transfer
+# ---------------------------------------------------------------------------
+# CRITICAL FIX: Install modern Hugging Face CLI with Transfer Acceleration
+# ---------------------------------------------------------------------------
+python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
 export PYTHONUNBUFFERED=1
@@ -110,7 +112,7 @@ EOL
 fi
 
 # ---------------------------------------------------------------------------
-# REPO UPDATES (Broken down for debugging)
+# REPO UPDATES
 # ---------------------------------------------------------------------------
 echo "Updating ComfyUI..."
 cd /ComfyUI && git pull && pip install -r requirements.txt
@@ -131,7 +133,9 @@ cd /ComfyUI/custom_nodes/ComfyUI-KJNodes
 git pull
 pip install -r requirements.txt
 
-# Aria2 Function
+# ---------------------------------------------------------------------------
+# UPDATED DOWNLOAD FUNCTION (Uses optimized hf_transfer)
+# ---------------------------------------------------------------------------
 hf_get() {
   local repo="$1" rel="$2" dest="$3"
   local dest_dir; dest_dir="$(dirname "$dest")"
@@ -143,15 +147,20 @@ hf_get() {
   fi
 
   mkdir -p "$dest_dir"
-  local url="https://huggingface.co/${repo}/resolve/main/${rel}"
   
-  if command -v aria2c &> /dev/null; then
-    echo "aria2c downloading: $filename"
-    aria2c --console-log-level=error --summary-interval=5 -c -x 8 -s 8 -k 1M "$url" -d "$dest_dir" -o "$filename"
-  else
-    HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
-    local src="$dest_dir/$rel"
-    [ "$src" != "$dest" ] && [ -f "$src" ] && mv -f "$src" "$dest" && rmdir -p "$(dirname "$src")" 2>/dev/null || true
+  # Ensure HF Transfer is enabled
+  export HF_HUB_ENABLE_HF_TRANSFER=1
+
+  # Download using the native HF client (Much faster than aria2c for HF links)
+  echo "Downloading $filename..."
+  hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
+  
+  # Handle the nested structure hf download creates
+  local src="$dest_dir/$rel"
+  if [ "$src" != "$dest" ] && [ -f "$src" ]; then
+      mv -f "$src" "$dest"
+      # Cleanup empty directories left behind
+      rmdir -p "$(dirname "$src")" 2>/dev/null || true
   fi
 }
 
@@ -230,7 +239,7 @@ if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
   ( hf_get "Comfy-Org/z_image_turbo" "split_files/text_encoders/qwen_3_4b.safetensors" "/workspace/ComfyUI/models/clip/qwen_3_4b.safetensors" ) &
   PIDS="$PIDS $!"
 
-  ( hf_get "Comfy-Org/z_image_turbo" "split_files/vae/z_image_turbo_vae.safetensors" "/workspace/ComfyUI/models/vae/z_image_turbo_vae.safetensors" ) &
+  ( hf_get "Comfy-Org/z_image_turbo" "split_files/vae/ae.safetensors" "/workspace/ComfyUI/models/vae/ae.safetensors" ) &
   PIDS="$PIDS $!"
 
   (
