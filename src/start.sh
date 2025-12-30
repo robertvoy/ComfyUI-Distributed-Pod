@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Use libtcmalloc for better memory management (use full path)
+# Use libtcmalloc for better memory management
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
@@ -20,16 +20,19 @@ else
   echo "additional_params.sh not found in /workspace. Skipping..."
 fi
 
-# Minimal deps
-if ! which aria2 >/dev/null 2>&1; then
-  apt-get update && apt-get install -y aria2
+# ---------------------------------------------------------------------------
+# OPTIMIZATION 1: Consolidated apt-get calls
+# ---------------------------------------------------------------------------
+PACKAGES=""
+if ! which aria2 >/dev/null 2>&1; then PACKAGES="$PACKAGES aria2"; fi
+if ! which curl >/dev/null 2>&1; then PACKAGES="$PACKAGES curl"; fi
+if ! dpkg -s bash-completion >/dev/null 2>&1; then PACKAGES="$PACKAGES bash-completion"; fi
+
+if [ -n "$PACKAGES" ]; then
+  echo "Installing missing packages: $PACKAGES"
+  apt-get update && apt-get install -y $PACKAGES
 else
-  echo "aria2 is already installed"
-fi
-if ! which curl >/dev/null 2>&1; then
-  apt-get update && apt-get install -y curl
-else
-  echo "curl is already installed"
+  echo "All system dependencies already installed."
 fi
 
 URL="http://127.0.0.1:8188"
@@ -46,11 +49,6 @@ PS1='\u@\h:\w\# '
 if [ -f /etc/bash_completion ] && ! shopt -oq posix; then . /etc/bash_completion; fi
 EOF
   echo ".bashrc created for root."
-fi
-
-# Bash completion (optional nicety)
-if ! dpkg -s bash-completion >/dev/null 2>&1; then
-  apt-get update && apt-get install -y bash-completion
 fi
 
 echo "Starting JupyterLab on root directory..."
@@ -150,59 +148,81 @@ hf_get () {
   fi
 
   mkdir -p "$dest_dir"
+  # Quietly download in background
   HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$repo" \
-    --include "$rel" --revision main --local-dir "$dest_dir"
+    --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
 
   local src="$dest_dir/$rel"
   if [ "$src" != "$dest" ]; then
     mkdir -p "$(dirname "$dest")"
     mv -f "$src" "$dest"
-    # remove empty nested dirs created by $rel (ignore if not empty)
     rmdir -p "$(dirname "$src")" 2>/dev/null || true
   else
-    echo "Already at destination: $(basename "$dest")"
+    echo "Downloaded: $(basename "$dest")"
   fi
 }
 
-# Only prepare Video Upscaler Preset if enabled
-if [ "${PRESET_VIDEO_UPSCALER:-true}" != "false" ]; then
-  echo "Preparing Video Upscaler Preset"
+# ---------------------------------------------------------------------------
+# PRESET 1: VIDEO UPSCALER (Wan 2.2 T2V + Upscalers)
+# ---------------------------------------------------------------------------
+if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
+  echo "Preparing Video Upscaler Preset (Parallel)..."
+  
+  # Install Custom Node
   (
     cd /ComfyUI/custom_nodes/
-    git clone https://github.com/ClownsharkBatwing/RES4LYF/ || true
-    cd RES4LYF || exit 1
-    pip install -r requirements.txt
+    if [ ! -d "RES4LYF" ]; then git clone https://github.com/ClownsharkBatwing/RES4LYF/; fi
+    cd RES4LYF && pip install -r requirements.txt
+  ) &
 
-    # WAN 2.2 diffusion model
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-      "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" \
-      "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+  # Wan T2V Model
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" ) &
 
-    # Text encoder -> /models/clip
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-      "split_files/text_encoders/umt5_xxl_fp16.safetensors" \
-      "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors"
+  # Shared: T5 Text Encoder
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" ) &
 
-    # VAE -> /models/vae
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
-      "split_files/vae/wan_2.1_vae.safetensors" \
-      "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors"
+  # Shared: VAE
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" ) &
 
-    # LoRA -> /models/loras
-    hf_get "Kijai/WanVideo_comfy" \
-      "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" \
-      "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors"
+  # LoRA
+  ( hf_get "Kijai/WanVideo_comfy" "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" ) &
 
-    # Upscaler -> /models/upscale_models
-    hf_get "Phips/4xNomos8kDAT" \
-      "4xNomos8kDAT.safetensors" \
-      "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
-      
-    # Upscaler 2 -> /models/upscale_models
-    hf_get "ai-forever/Real-ESRGAN" \
-      "RealESRGAN_x2.pth" \
-      "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
-  )
+  # Upscalers
+  (
+    hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
+    hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
+  ) &
+
+  wait
+  echo "Video Upscaler Preset: Complete."
+fi
+
+# ---------------------------------------------------------------------------
+# PRESET 2: WAN 2.2 FP16 I2V (High Quality Image-to-Video)
+# ---------------------------------------------------------------------------
+if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
+  echo "Preparing Wan 2.2 FP16 I2V Preset (Parallel)..."
+
+  # Shared: T5 Text Encoder (Skips if downloaded by Preset 1)
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" ) &
+
+  # Shared: VAE (Skips if downloaded by Preset 1)
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" ) &
+
+  # I2V Low Noise Model (FP16)
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" ) &
+
+  # I2V High Noise Model (FP16)
+  ( hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" ) &
+
+  # Distilled LoRAs (Grouped to avoid race conditions on same repo)
+  (
+    hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
+    hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
+  ) &
+
+  wait
+  echo "Wan 2.2 FP16 I2V Preset: Complete."
 fi
 
 # Install Nunchaku if enabled
@@ -211,86 +231,56 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
   (
     set -e
     
-    # Clone the ComfyUI-nunchaku repository
     cd /ComfyUI/custom_nodes
     if [ ! -d "ComfyUI-nunchaku" ]; then
       git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/
-      echo "ComfyUI-nunchaku cloned successfully"
     else
-      echo "ComfyUI-nunchaku already exists, updating..."
       cd ComfyUI-nunchaku && git pull
     fi
     
-    # Detect PyTorch version
     TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
-    echo "Detected PyTorch version: ${TORCH_VERSION}"
+    check_url() { curl --head --silent --fail "$1" > /dev/null 2>&1; }
     
-    # Function to check if URL exists
-    check_url() {
-      curl --head --silent --fail "$1" > /dev/null 2>&1
-    }
-    
-    # Base URL and construct wheel URL
     WHEEL_VERSION="1.1.0"
     WHEEL_BASE_URL="https://github.com/nunchaku-tech/nunchaku/releases/download/v${WHEEL_VERSION}"
     WHEEL_NAME="nunchaku-${WHEEL_VERSION}+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
     WHEEL_URL="${WHEEL_BASE_URL}/${WHEEL_NAME}"
     
-    # Check if wheel exists for detected version
-    echo "Checking for Nunchaku wheel for PyTorch ${TORCH_VERSION}..."
     if check_url "${WHEEL_URL}"; then
-      echo "Found wheel for PyTorch ${TORCH_VERSION}, installing..."
       pip install "${WHEEL_URL}"
-      echo "Nunchaku installation successful"
     else
-      # Try common fallback versions in order
-      echo "No wheel found for PyTorch ${TORCH_VERSION}, trying fallback versions..."
       FALLBACK_VERSIONS="2.8 2.7 2.6 2.5 2.4 2.3"
-      
       INSTALLED=false
       for VERSION in ${FALLBACK_VERSIONS}; do
         FALLBACK_URL="${WHEEL_BASE_URL}/nunchaku-1.0.0+torch${VERSION}-cp312-cp312-linux_x86_64.whl"
         if check_url "${FALLBACK_URL}"; then
-          echo "Found fallback wheel for PyTorch ${VERSION}, installing..."
           pip install "${FALLBACK_URL}"
-          echo "Nunchaku installed using PyTorch ${VERSION} wheel (fallback)"
           INSTALLED=true
           break
         fi
       done
-      
-      if [ "${INSTALLED}" = false ]; then
-        echo "ERROR: Could not find compatible Nunchaku wheel. Please check available versions."
-        exit 1
-      fi
+      if [ "${INSTALLED}" = false ]; then echo "ERROR: No Nunchaku wheel found."; exit 1; fi
     fi
-    
-    echo "Nunchaku installation complete"
   )
-else
-  echo "Nunchaku disabled, skipping installation"
 fi
 
 # Wait for SageAttention (if building)
 if [ -n "${BUILD_PID:-}" ]; then
-  echo "Waiting for SageAttention build to complete..."
+  echo "Waiting for SageAttention build..."
   while kill -0 "$BUILD_PID" 2>/dev/null; do
-    echo "SageAttention build in progress... (this can take up to 5 minutes)"
     sleep 10
   done
-  echo "SageAttention build complete"
 fi
 
 # Start ComfyUI
 echo "Launching ComfyUI"
-if [ "${SAGE_ATTENTION:-true}" = "false" ]; then
-  nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
-else
-  nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header --use-sage-attention > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
-fi
+ARGS="--listen --enable-cors-header"
+[ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
+
+nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
 
 until curl --silent --fail "$URL" --output /dev/null; do
-  echo "Launching ComfyUI"
+  echo "Launching ComfyUI..."
   sleep 2
 done
 echo "ComfyUI is ready"
