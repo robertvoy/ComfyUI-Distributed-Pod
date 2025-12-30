@@ -131,19 +131,6 @@ cd /ComfyUI/custom_nodes/ComfyUI-KJNodes
 git pull
 pip install -r requirements.txt
 
-echo "Installing Crystools..."
-cd /ComfyUI/custom_nodes
-if [ ! -d "comfyui-crystools" ]; then
-    git clone https://github.com/crystian/comfyui-crystools.git
-    cd comfyui-crystools
-else
-    cd comfyui-crystools
-    echo "Pulling Crystools..."
-    git pull
-fi
-echo "Installing Crystools reqs..."
-pip install -r requirements.txt
-
 # Aria2 Function
 hf_get() {
   local repo="$1" rel="$2" dest="$3"
