@@ -217,6 +217,32 @@ if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
   echo "Wan 2.2 FP16 I2V Preset: Complete."
 fi
 
+# ---------------------------------------------------------------------------
+# PRESET 3: Z-IMAGE TURBO
+# ---------------------------------------------------------------------------
+if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
+  echo "Preparing Z-Image Turbo Preset..."
+  PIDS=""
+
+  ( hf_get "Comfy-Org/z_image_turbo" "split_files/diffusion_models/z_image_turbo_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/z_image_turbo_bf16.safetensors" ) &
+  PIDS="$PIDS $!"
+
+  ( hf_get "Comfy-Org/z_image_turbo" "split_files/text_encoders/qwen_3_4b.safetensors" "/workspace/ComfyUI/models/clip/qwen_3_4b.safetensors" ) &
+  PIDS="$PIDS $!"
+
+  ( hf_get "Comfy-Org/z_image_turbo" "split_files/vae/z_image_turbo_vae.safetensors" "/workspace/ComfyUI/models/vae/z_image_turbo_vae.safetensors" ) &
+  PIDS="$PIDS $!"
+
+  (
+    hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
+    hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
+  ) &
+  PIDS="$PIDS $!"
+
+  wait $PIDS
+  echo "Z-Image Turbo Preset: Complete."
+fi
+
 # Nunchaku
 if [ "${NUNCHAKU:-true}" != "false" ]; then
   echo "Installing Nunchaku..."
