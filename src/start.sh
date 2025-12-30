@@ -5,9 +5,6 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-# ---------------------------------------------------------------------------
-# CRITICAL FIX: Install modern Hugging Face CLI with Transfer Acceleration
-# ---------------------------------------------------------------------------
 python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
@@ -48,15 +45,19 @@ fi
 # Directories
 mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models}
 
-# SageAttention Build (Background)
+# ---------------------------------------------------------------------------
+# SAGEATTENTION BUILD
+# ---------------------------------------------------------------------------
+# We start this NOW so it compiles while we download models below.
 if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
   if [ ! -d "SageAttention" ]; then
-      echo "Starting SageAttention build in background..."
+      echo "Starting SageAttention build in background (this takes time)..."
       (
         set -e
         git clone https://github.com/thu-ml/SageAttention.git || true
         cd SageAttention
-        python3 setup.py install
+        # CRITICAL FIX: Use --no-build-isolation to use existing torch
+        pip install . --no-build-isolation
         pip install --no-cache-dir triton
       ) &> /var/log/sage_build.log &
       BUILD_PID=$!
@@ -134,7 +135,7 @@ git pull
 pip install -r requirements.txt
 
 # ---------------------------------------------------------------------------
-# UPDATED DOWNLOAD FUNCTION (Uses optimized hf_transfer)
+# DOWNLOAD FUNCTION
 # ---------------------------------------------------------------------------
 hf_get() {
   local repo="$1" rel="$2" dest="$3"
@@ -147,14 +148,14 @@ hf_get() {
   fi
 
   mkdir -p "$dest_dir"
-  
+   
   # Ensure HF Transfer is enabled
   export HF_HUB_ENABLE_HF_TRANSFER=1
 
   # Download using the native HF client (Much faster than aria2c for HF links)
   echo "Downloading $filename..."
   hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
-  
+   
   # Handle the nested structure hf download creates
   local src="$dest_dir/$rel"
   if [ "$src" != "$dest" ] && [ -f "$src" ]; then
@@ -170,7 +171,7 @@ hf_get() {
 if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
   echo "Preparing Video Upscaler Preset..."
   PIDS=""
-  
+   
   ( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF/; } && cd RES4LYF && pip install -r requirements.txt ) &
   PIDS="$PIDS $!"
 
@@ -180,14 +181,14 @@ if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
     hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
   ) &
   PIDS="$PIDS $!"
-  
+   
   ( 
     hf_get "Kijai/WanVideo_comfy" "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" 
     hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
     hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
   ) &
   PIDS="$PIDS $!"
-  
+   
   wait $PIDS
   echo "Video Upscaler Preset: Complete."
 fi
@@ -204,13 +205,13 @@ if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
     hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
   ) &
   PIDS="$PIDS $!"
-  
+   
   ( 
     hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
     hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
   ) &
   PIDS="$PIDS $!"
-  
+   
   (
     hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
     hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
@@ -252,13 +253,13 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
     set -e
     cd /ComfyUI/custom_nodes
     [ ! -d "ComfyUI-nunchaku" ] && git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/ || (cd ComfyUI-nunchaku && git pull)
-    
+     
     TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
     check_url() { curl --head --silent --fail "$1" > /dev/null 2>&1; }
-    
+     
     WHEEL_BASE="https://github.com/nunchaku-tech/nunchaku/releases/download/v1.1.0"
     WHEEL_URL="${WHEEL_BASE}/nunchaku-1.1.0+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
-    
+     
     if check_url "${WHEEL_URL}"; then
       pip install "${WHEEL_URL}"
     else
@@ -270,12 +271,27 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
   )
 fi
 
-# Wait for SageAttention Build
+# ---------------------------------------------------------------------------
+# ENABLE TERMINAL AUTOCOMPLETE
+# ---------------------------------------------------------------------------
+if ! grep -q "bash_completion" /root/.bashrc; then
+    cat >> /root/.bashrc <<'EOF'
+if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+fi
+EOF
+fi
+
+# ---------------------------------------------------------------------------
+# WAIT FOR SAGEATTENTION BUILD TO FINISH
+# ---------------------------------------------------------------------------
 if [ -n "${BUILD_PID:-}" ]; then
   if kill -0 "$BUILD_PID" 2>/dev/null; then
       echo "----------------------------------------------------------------"
-      echo "Waiting for SageAttention build (streaming logs)..."
+      echo "Waiting for SageAttention build to finish..."
+      echo "You can monitor progress with: tail -f /var/log/sage_build.log"
       echo "----------------------------------------------------------------"
+      # This tails the log until the PID (SageAttention build) finishes
       tail -f /var/log/sage_build.log --pid=$BUILD_PID
   fi
 fi
