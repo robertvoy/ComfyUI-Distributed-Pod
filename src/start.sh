@@ -9,6 +9,10 @@ TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 python3 -m pip install "huggingface_hub<1.0" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
+export PYTHONUNBUFFERED=1
+export GIT_TERMINAL_PROMPT=0
+export GIT_MERGE_AUTOEDIT=no
+
 [ -n "${HF_API_TOKEN:-}" ] && hf auth login --token "$HF_API_TOKEN" || true
 
 # User Hook
@@ -34,7 +38,7 @@ URL="http://127.0.0.1:8188"
 COMFYUI_DIR="/ComfyUI"
 WORKFLOW_DIR="/ComfyUI/user/default/workflows"
 
-# Start Jupyter (Background, not tracked by wait)
+# Start Jupyter (Background)
 if ! pgrep -f "jupyter-lab" > /dev/null; then
   jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
 fi
@@ -42,7 +46,7 @@ fi
 # Directories
 mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models}
 
-# SageAttention Build (Background - Tracked separately)
+# SageAttention Build (Background)
 if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
   if [ ! -d "SageAttention" ]; then
       echo "Starting SageAttention build in background..."
@@ -105,28 +109,40 @@ comfyui:
 EOL
 fi
 
-# Update ComfyUI & Standard Nodes
+# ---------------------------------------------------------------------------
+# REPO UPDATES (Broken down for debugging)
+# ---------------------------------------------------------------------------
 echo "Updating ComfyUI..."
 cd /ComfyUI && git pull && pip install -r requirements.txt
 
-echo "Updating Custom Nodes..."
+echo "Updating ComfyUI-Distributed..."
 cd /ComfyUI/custom_nodes/ComfyUI-Distributed
 git fetch origin
 git checkout "${DISTRIBUTED_BRANCH:-main}"
 git pull origin "${DISTRIBUTED_BRANCH:-main}"
 
-cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt
-cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt
+echo "Updating WanVideoWrapper..."
+cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper
+git pull
+pip install -r requirements.txt
 
-# Install Crystools
+echo "Updating KJNodes..."
+cd /ComfyUI/custom_nodes/ComfyUI-KJNodes
+git pull
+pip install -r requirements.txt
+
 echo "Installing Crystools..."
 cd /ComfyUI/custom_nodes
 if [ ! -d "comfyui-crystools" ]; then
     git clone https://github.com/crystian/comfyui-crystools.git
+    cd comfyui-crystools
 else
-    cd comfyui-crystools && git pull
+    cd comfyui-crystools
+    echo "Pulling Crystools..."
+    git pull
 fi
-cd /ComfyUI/custom_nodes/comfyui-crystools && pip install -r requirements.txt
+echo "Installing Crystools reqs..."
+pip install -r requirements.txt
 
 # Aria2 Function
 hf_get() {
@@ -180,7 +196,7 @@ if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
   ) &
   PIDS="$PIDS $!"
   
-  # IMPORTANT: Wait ONLY for these PIDs, not Jupyter
+  # Wait ONLY for these PIDs
   wait $PIDS
   echo "Video Upscaler Preset: Complete."
 fi
@@ -210,7 +226,6 @@ if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
   ) &
   PIDS="$PIDS $!"
 
-  # IMPORTANT: Wait ONLY for these PIDs, not Jupyter
   wait $PIDS
   echo "Wan 2.2 FP16 I2V Preset: Complete."
 fi
