@@ -127,12 +127,21 @@ EOL
 fi
 
 # Update ComfyUI + nodes
+echo "Updating ComfyUI..."
 cd /ComfyUI && git pull && pip install -r requirements.txt
-echo "Updating ComfyUI-Distributed."
-cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git pull
-echo "Updating WanVideoWrapper."
+
+echo "Updating ComfyUI-Distributed..."
+cd /ComfyUI/custom_nodes/ComfyUI-Distributed
+# Branch switching logic
+TARGET_BRANCH="${DISTRIBUTED_BRANCH:-main}"
+echo "Switching ComfyUI-Distributed to branch: $TARGET_BRANCH"
+git fetch origin
+git checkout "$TARGET_BRANCH"
+git pull origin "$TARGET_BRANCH"
+
+echo "Updating WanVideoWrapper..."
 cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt
-echo "Updating KJNodes."
+echo "Updating KJNodes..."
 cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt
 
 # Download a single file from a repo to an exact path (skip if present)
