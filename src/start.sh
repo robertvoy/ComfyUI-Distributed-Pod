@@ -125,7 +125,7 @@ echo "Install Easy-Sam3..."
 
 # Download SAM3 Model
 echo "Downloading SAM3 Model..."
-mkdir -p /ComfyUI/models/sam3
+mkdir -p /workspace/ComfyUI/models/sam3
 hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /workspace/ComfyUI/models/sam3
 
 # ---------------------------------------------------------------------------
