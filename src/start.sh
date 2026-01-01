@@ -150,7 +150,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# DOWNLOAD FUNCTION
+# DOWNLOAD FUNCTION (High Speed Retry Strategy)
 # ---------------------------------------------------------------------------
 hf_get() {
   local repo="$1" rel="$2" dest="$3"
@@ -164,18 +164,45 @@ hf_get() {
 
   mkdir -p "$dest_dir"
   
-  # Ensure HF Transfer is enabled
+  # Ensure High Speed is ON
   export HF_HUB_ENABLE_HF_TRANSFER=1
+  
+  local retries=0
+  local max_retries=5
+  local success=false
 
-  # Download using the native HF client
-  echo "Downloading $filename..."
-  hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
+  echo "Downloading $filename (High Speed)..."
+
+  while [ $retries -lt $max_retries ]; do
+    # Try the download
+    if hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir"; then
+      success=true
+      break
+    else
+      retries=$((retries + 1))
+      echo "----------------------------------------------------------------"
+      echo "Download failed (Attempt $retries/$max_retries)."
+      
+      if [ $retries -lt $max_retries ]; then
+        echo "Retrying High Speed download in 3 seconds..."
+        sleep 3
+      else
+        echo "All $max_retries attempts failed."
+      fi
+      echo "----------------------------------------------------------------"
+    fi
+  done
+
+  # If we exhausted retries without success, return error (killing the script)
+  if [ "$success" = "false" ]; then
+    echo "CRITICAL ERROR: Could not download $filename after $max_retries attempts."
+    return 1
+  fi
   
   # Handle the nested structure hf download creates
   local src="$dest_dir/$rel"
   if [ "$src" != "$dest" ] && [ -f "$src" ]; then
       mv -f "$src" "$dest"
-      # Cleanup empty directories left behind
       rmdir -p "$(dirname "$src")" 2>/dev/null || true
   fi
 }
