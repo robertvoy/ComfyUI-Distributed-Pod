@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ulimit -n 65535 || true
+
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
