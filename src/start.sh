@@ -4,7 +4,7 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-python3 -m pip install --upgrade "huggingface_hub[cli]<1.0"
+python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
 export PYTHONUNBUFFERED=1
@@ -45,27 +45,7 @@ fi
 # Directories
 mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models,sam3}
 
-# ---------------------------------------------------------------------------
-# SAGEATTENTION BUILD
-# ---------------------------------------------------------------------------
-if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
-  if [ ! -d "SageAttention" ]; then
-      echo "Starting SageAttention build in background (this takes time)..."
-      (
-        set -e
-        git clone https://github.com/thu-ml/SageAttention.git || true
-        cd SageAttention
-        # CRITICAL FIX: Use --no-build-isolation to use existing torch
-        pip install . --no-build-isolation
-        pip install --no-cache-dir triton
-      ) &> /var/log/sage_build.log &
-      BUILD_PID=$!
-  else
-      BUILD_PID=""
-  fi
-else
-  BUILD_PID=""
-fi
+
 
 # ---------------------------------------------------------------------------
 # Copy workflows & Configs
@@ -131,6 +111,23 @@ echo "Updating WanVideoWrapper..."
 echo "Updating KJNodes..."
 ( cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt )
 
+echo "Install RES4LYF..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
+
+echo "Install Inpaint-CropAndStitch..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Inpaint-CropAndStitch" ] && git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
+
+echo "Install SeedVR2..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-SeedVR2_VideoUpscaler" ] && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
+
+echo "Install Easy-Sam3..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Easy-Sam3" ] && git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
+
+# Download SAM3 Model
+echo "Downloading SAM3 Model..."
+mkdir -p /ComfyUI/models/sam3
+hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /ComfyUI/models/sam3
+
 # ---------------------------------------------------------------------------
 # DOWNLOAD FUNCTION
 # ---------------------------------------------------------------------------
@@ -166,7 +163,7 @@ hf_get() {
 # PRESET 1: VIDEO UPSCALER
 # ---------------------------------------------------------------------------
 if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
-  echo "Preparing Video Upscaler Preset (Sequential)..."
+  echo "Preparing Video Upscaler Preset"
   
   # Downloads
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" 
@@ -184,7 +181,7 @@ fi
 # PRESET 2: WAN 2.2 FP16 I2V
 # ---------------------------------------------------------------------------
 if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
-  echo "Preparing Wan 2.2 FP16 I2V Preset (Sequential)..."
+  echo "Preparing Wan 2.2 FP16 I2V Preset"
 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
@@ -202,7 +199,7 @@ fi
 # PRESET 3: Z-IMAGE TURBO
 # ---------------------------------------------------------------------------
 if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
-  echo "Preparing Z-Image Turbo Preset (Sequential)..."
+  echo "Preparing Z-Image Turbo Preset"
 
   hf_get "Comfy-Org/z_image_turbo" "split_files/diffusion_models/z_image_turbo_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/z_image_turbo_bf16.safetensors" 
   hf_get "Comfy-Org/z_image_turbo" "split_files/text_encoders/qwen_3_4b.safetensors" "/workspace/ComfyUI/models/clip/qwen_3_4b.safetensors" 
