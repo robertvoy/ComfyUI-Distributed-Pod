@@ -123,7 +123,7 @@ echo "Install Easy-Sam3..."
 # Download SAM3 Model
 echo "Downloading SAM3 Model..."
 mkdir -p /ComfyUI/models/sam3
-hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /ComfyUI/models/sam3
+hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /workspace/ComfyUI/models/sam3
 
 # ---------------------------------------------------------------------------
 # SAGEATTENTION BUILD
@@ -196,21 +196,36 @@ if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# PRESET 2: WAN 2.2 FP16 I2V
+# PRESET 2: WAN 2.2 FP16
 # ---------------------------------------------------------------------------
 if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
-  echo "Preparing Wan 2.2 FP16 I2V Preset"
+  echo "Preparing Wan 2.2 FP16 Preset (I2V + T2V)"
 
+  # Text Encoders & VAE
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
   
+  # Diffusion Models (I2V)
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
   
+  # Diffusion Models (T2V)
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
+
+  # LoRAs (T2V)
+  hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_t2v_A14b_low_noise_lora_rank64_lightx2v_4step_1217.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_A14b_low_noise_lora_rank64_lightx2v_4step_1217.safetensors"
+  hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_t2v_A14b_high_noise_lora_rank64_lightx2v_4step_1217.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_A14b_high_noise_lora_rank64_lightx2v_4step_1217.safetensors"
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+
+  # LoRAs (I2V)
   hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
   hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" 
 
-  echo "Wan 2.2 FP16 I2V Preset: Complete."
+  echo "Wan 2.2 FP16 Preset: Complete."
 fi
 
 # ---------------------------------------------------------------------------
