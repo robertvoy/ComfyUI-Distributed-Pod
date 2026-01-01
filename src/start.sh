@@ -131,23 +131,6 @@ echo "Updating WanVideoWrapper..."
 echo "Updating KJNodes..."
 ( cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt )
 
-echo "Install RES4LYF..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
-
-echo "Install Inpaint-CropAndStitch..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Inpaint-CropAndStitch" ] && git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
-
-echo "Install SeedVR2..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-SeedVR2_VideoUpscaler" ] && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
-
-echo "Install Easy-Sam3..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Easy-Sam3" ] && git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
-
-# Download SAM3 Model
-echo "Downloading SAM3 Model..."
-mkdir -p /ComfyUI/models/sam3
-hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /ComfyUI/models/sam3
-
 # ---------------------------------------------------------------------------
 # DOWNLOAD FUNCTION
 # ---------------------------------------------------------------------------
