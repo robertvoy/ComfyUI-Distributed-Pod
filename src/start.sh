@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Use libtcmalloc for better memory management
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
@@ -20,9 +19,10 @@ if [ -f "/workspace/additional_params.sh" ]; then
   /workspace/additional_params.sh
 fi
 
+# ---------------------------------------------------------------------------
 # Install dependencies
+# ---------------------------------------------------------------------------
 PACKAGES=""
-if ! which aria2 >/dev/null 2>&1; then PACKAGES="$PACKAGES aria2"; fi
 if ! which curl >/dev/null 2>&1; then PACKAGES="$PACKAGES curl"; fi
 if ! which tail >/dev/null 2>&1; then PACKAGES="$PACKAGES coreutils"; fi
 if ! dpkg -s bash-completion >/dev/null 2>&1; then PACKAGES="$PACKAGES bash-completion"; fi
@@ -43,12 +43,11 @@ if ! pgrep -f "jupyter-lab" > /dev/null; then
 fi
 
 # Directories
-mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models}
+mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models,sam3}
 
 # ---------------------------------------------------------------------------
 # SAGEATTENTION BUILD
 # ---------------------------------------------------------------------------
-# We start this NOW so it compiles while we download models below.
 if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
   if [ ! -d "SageAttention" ]; then
       echo "Starting SageAttention build in background (this takes time)..."
@@ -68,7 +67,9 @@ else
   BUILD_PID=""
 fi
 
+# ---------------------------------------------------------------------------
 # Copy workflows & Configs
+# ---------------------------------------------------------------------------
 mkdir -p "$WORKFLOW_DIR"
 if [ -d "/ComfyUI-Distributed-Pod/workflows" ]; then
   cp -r "/ComfyUI-Distributed-Pod/workflows/"* "$WORKFLOW_DIR/"
@@ -102,6 +103,7 @@ comfyui:
   photomaker: models/photomaker/
   RMBG: models/RMBG/
   sams: models/sams/
+  sam3: models/sam3/
   style_models: models/style_models/
   text_encoders: models/text_encoders/
   unet: models/unet/
@@ -113,26 +115,38 @@ EOL
 fi
 
 # ---------------------------------------------------------------------------
-# REPO UPDATES
+# REPO UPDATES & INSTALLS
 # ---------------------------------------------------------------------------
+# Note: Using subshells ( ) prevents directory drift so we don't install repos inside other repos
+
 echo "Updating ComfyUI..."
-cd /ComfyUI && git pull && pip install -r requirements.txt
+( cd /ComfyUI && git pull && pip install -r requirements.txt )
 
 echo "Updating ComfyUI-Distributed..."
-cd /ComfyUI/custom_nodes/ComfyUI-Distributed
-git fetch origin
-git checkout "${DISTRIBUTED_BRANCH:-main}"
-git pull origin "${DISTRIBUTED_BRANCH:-main}"
+( cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git fetch origin && git checkout "${DISTRIBUTED_BRANCH:-main}" && git pull origin "${DISTRIBUTED_BRANCH:-main}" )
 
 echo "Updating WanVideoWrapper..."
-cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper
-git pull
-pip install -r requirements.txt
+( cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt )
 
 echo "Updating KJNodes..."
-cd /ComfyUI/custom_nodes/ComfyUI-KJNodes
-git pull
-pip install -r requirements.txt
+( cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt )
+
+echo "Install RES4LYF..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
+
+echo "Install Inpaint-CropAndStitch..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Inpaint-CropAndStitch" ] && git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
+
+echo "Install SeedVR2..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-SeedVR2_VideoUpscaler" ] && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
+
+echo "Install Easy-Sam3..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Easy-Sam3" ] && git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
+
+# Download SAM3 Model
+echo "Downloading SAM3 Model..."
+mkdir -p /ComfyUI/models/sam3
+hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /ComfyUI/models/sam3
 
 # ---------------------------------------------------------------------------
 # DOWNLOAD FUNCTION
@@ -148,14 +162,14 @@ hf_get() {
   fi
 
   mkdir -p "$dest_dir"
-   
+  
   # Ensure HF Transfer is enabled
   export HF_HUB_ENABLE_HF_TRANSFER=1
 
-  # Download using the native HF client (Much faster than aria2c for HF links)
+  # Download using the native HF client
   echo "Downloading $filename..."
   hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
-   
+  
   # Handle the nested structure hf download creates
   local src="$dest_dir/$rel"
   if [ "$src" != "$dest" ] && [ -f "$src" ]; then
@@ -169,27 +183,17 @@ hf_get() {
 # PRESET 1: VIDEO UPSCALER
 # ---------------------------------------------------------------------------
 if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
-  echo "Preparing Video Upscaler Preset..."
-  PIDS=""
-   
-  ( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF/; } && cd RES4LYF && pip install -r requirements.txt ) &
-  PIDS="$PIDS $!"
-
-  ( 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
-  ) &
-  PIDS="$PIDS $!"
-   
-  ( 
-    hf_get "Kijai/WanVideo_comfy" "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" 
-    hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
-    hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
-  ) &
-  PIDS="$PIDS $!"
-   
-  wait $PIDS
+  echo "Preparing Video Upscaler Preset (Sequential)..."
+  
+  # Downloads
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
+  
+  hf_get "Kijai/WanVideo_comfy" "Wan22-Lightning/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" "/workspace/ComfyUI/models/loras/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors" 
+  hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
+  hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
+  
   echo "Video Upscaler Preset: Complete."
 fi
 
@@ -197,28 +201,17 @@ fi
 # PRESET 2: WAN 2.2 FP16 I2V
 # ---------------------------------------------------------------------------
 if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
-  echo "Preparing Wan 2.2 FP16 I2V Preset..."
-  PIDS=""
+  echo "Preparing Wan 2.2 FP16 I2V Preset (Sequential)..."
 
-  ( 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
-  ) &
-  PIDS="$PIDS $!"
-   
-  ( 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
-    hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
-  ) &
-  PIDS="$PIDS $!"
-   
-  (
-    hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
-    hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
-  ) &
-  PIDS="$PIDS $!"
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
+  
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
+  
+  hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
+  hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
 
-  wait $PIDS
   echo "Wan 2.2 FP16 I2V Preset: Complete."
 fi
 
@@ -226,40 +219,34 @@ fi
 # PRESET 3: Z-IMAGE TURBO
 # ---------------------------------------------------------------------------
 if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
-  echo "Preparing Z-Image Turbo Preset..."
-  PIDS=""
+  echo "Preparing Z-Image Turbo Preset (Sequential)..."
 
-  ( 
-    hf_get "Comfy-Org/z_image_turbo" "split_files/diffusion_models/z_image_turbo_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/z_image_turbo_bf16.safetensors" 
-    hf_get "Comfy-Org/z_image_turbo" "split_files/text_encoders/qwen_3_4b.safetensors" "/workspace/ComfyUI/models/clip/qwen_3_4b.safetensors" 
-    hf_get "Comfy-Org/z_image_turbo" "split_files/vae/ae.safetensors" "/workspace/ComfyUI/models/vae/ae.safetensors" 
-  ) &
-  PIDS="$PIDS $!"
+  hf_get "Comfy-Org/z_image_turbo" "split_files/diffusion_models/z_image_turbo_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/z_image_turbo_bf16.safetensors" 
+  hf_get "Comfy-Org/z_image_turbo" "split_files/text_encoders/qwen_3_4b.safetensors" "/workspace/ComfyUI/models/clip/qwen_3_4b.safetensors" 
+  hf_get "Comfy-Org/z_image_turbo" "split_files/vae/ae.safetensors" "/workspace/ComfyUI/models/vae/ae.safetensors" 
+  
+  hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
+  hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
 
-  (
-    hf_get "Phips/4xNomos8kDAT" "4xNomos8kDAT.safetensors" "/workspace/ComfyUI/models/upscale_models/4xNomos8kDAT.safetensors"
-    hf_get "ai-forever/Real-ESRGAN" "RealESRGAN_x2.pth" "/workspace/ComfyUI/models/upscale_models/RealESRGAN_x2.pth"
-  ) &
-  PIDS="$PIDS $!"
-
-  wait $PIDS
   echo "Z-Image Turbo Preset: Complete."
 fi
 
+# ---------------------------------------------------------------------------
 # Nunchaku
+# ---------------------------------------------------------------------------
 if [ "${NUNCHAKU:-true}" != "false" ]; then
   echo "Installing Nunchaku..."
   (
     set -e
     cd /ComfyUI/custom_nodes
     [ ! -d "ComfyUI-nunchaku" ] && git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/ || (cd ComfyUI-nunchaku && git pull)
-     
+    
     TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
     check_url() { curl --head --silent --fail "$1" > /dev/null 2>&1; }
-     
+    
     WHEEL_BASE="https://github.com/nunchaku-tech/nunchaku/releases/download/v1.1.0"
     WHEEL_URL="${WHEEL_BASE}/nunchaku-1.1.0+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
-     
+    
     if check_url "${WHEEL_URL}"; then
       pip install "${WHEEL_URL}"
     else
@@ -296,7 +283,9 @@ if [ -n "${BUILD_PID:-}" ]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
 # Launch
+# ---------------------------------------------------------------------------
 if ! pgrep -f "main.py --listen" > /dev/null; then
   echo "Launching ComfyUI"
   ARGS="--listen --enable-cors-header"
