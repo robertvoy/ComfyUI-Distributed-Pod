@@ -50,21 +50,19 @@ mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_mo
 # ---------------------------------------------------------------------------
 if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
   if [ ! -d "SageAttention" ]; then
-      echo "Starting SageAttention build in background (this takes time)..."
-      (
-        set -e
-        git clone https://github.com/thu-ml/SageAttention.git || true
-        cd SageAttention
-        # CRITICAL FIX: Use --no-build-isolation to use existing torch
-        pip install . --no-build-isolation
-        pip install --no-cache-dir triton
-      ) &> /var/log/sage_build.log &
-      BUILD_PID=$!
-  else
-      BUILD_PID=""
+      echo "Starting SageAttention build (Sequentially to prevent Pip locking conflicts)..."
+      
+      # Step 1: Clone
+      git clone https://github.com/thu-ml/SageAttention.git || true
+      
+      # Step 2: Install
+      cd SageAttention
+      pip install . --no-build-isolation
+      pip install --no-cache-dir triton
+      cd ..
+      
+      echo "SageAttention build complete."
   fi
-else
-  BUILD_PID=""
 fi
 
 # ---------------------------------------------------------------------------
@@ -117,7 +115,6 @@ fi
 # ---------------------------------------------------------------------------
 # REPO UPDATES & INSTALLS
 # ---------------------------------------------------------------------------
-
 echo "Updating ComfyUI..."
 ( cd /ComfyUI && git pull && pip install -r requirements.txt )
 
@@ -266,20 +263,6 @@ if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
 fi
 EOF
-fi
-
-# ---------------------------------------------------------------------------
-# WAIT FOR SAGEATTENTION BUILD TO FINISH
-# ---------------------------------------------------------------------------
-if [ -n "${BUILD_PID:-}" ]; then
-  if kill -0 "$BUILD_PID" 2>/dev/null; then
-      echo "----------------------------------------------------------------"
-      echo "Waiting for SageAttention build to finish..."
-      echo "You can monitor progress with: tail -f /var/log/sage_build.log"
-      echo "----------------------------------------------------------------"
-      # This tails the log until the PID (SageAttention build) finishes
-      tail -f /var/log/sage_build.log --pid=$BUILD_PID
-  fi
 fi
 
 # ---------------------------------------------------------------------------
