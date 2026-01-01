@@ -4,7 +4,7 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
+python3 -m pip install --upgrade "huggingface_hub[cli]<1.0"
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
 export PYTHONUNBUFFERED=1
