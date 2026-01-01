@@ -111,6 +111,9 @@ echo "Updating KJNodes..."
 echo "Install RES4LYF..."
 ( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
 
+echo "Install ComfyUI-LongLook..."
+( cd /ComfyUI/custom_nodes/ && { [ ! -d "comfyUI-LongLook" ] && git clone https://github.com/shootthesound/comfyUI-LongLook; } )
+
 echo "Install Inpaint-CropAndStitch..."
 ( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Inpaint-CropAndStitch" ] && git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
 
