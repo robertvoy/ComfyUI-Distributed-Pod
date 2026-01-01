@@ -4,7 +4,7 @@ set -euo pipefail
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-python3 -m pip install --upgrade "huggingface_hub[cli]<1.0"
+python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
 export PYTHONUNBUFFERED=1
@@ -109,19 +109,19 @@ echo "Updating KJNodes..."
 ( cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt )
 
 echo "Install RES4LYF..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "RES4LYF" ] && git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
+( cd /ComfyUI/custom_nodes/ && { [ -d "RES4LYF" ] || git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
 
 echo "Install ComfyUI-LongLook..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "comfyUI-LongLook" ] && git clone https://github.com/shootthesound/comfyUI-LongLook; } )
+( cd /ComfyUI/custom_nodes/ && { [ -d "comfyUI-LongLook" ] || git clone https://github.com/shootthesound/comfyUI-LongLook; } )
 
 echo "Install Inpaint-CropAndStitch..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Inpaint-CropAndStitch" ] && git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
+( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-Inpaint-CropAndStitch" ] || git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
 
 echo "Install SeedVR2..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-SeedVR2_VideoUpscaler" ] && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
+( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-SeedVR2_VideoUpscaler" ] || git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
 
 echo "Install Easy-Sam3..."
-( cd /ComfyUI/custom_nodes/ && { [ ! -d "ComfyUI-Easy-Sam3" ] && git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
+( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-Easy-Sam3" ] || git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
 
 # Download SAM3 Model
 echo "Downloading SAM3 Model..."
