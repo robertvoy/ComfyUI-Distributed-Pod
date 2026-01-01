@@ -45,7 +45,27 @@ fi
 # Directories
 mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,controlnet,diffusion_models,unet,loras,clip_vision,upscale_models,sam3}
 
-
+# ---------------------------------------------------------------------------
+# SAGEATTENTION BUILD
+# ---------------------------------------------------------------------------
+if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
+  if [ ! -d "SageAttention" ]; then
+      echo "Starting SageAttention build in background (this takes time)..."
+      (
+        set -e
+        git clone https://github.com/thu-ml/SageAttention.git || true
+        cd SageAttention
+        # CRITICAL FIX: Use --no-build-isolation to use existing torch
+        pip install . --no-build-isolation
+        pip install --no-cache-dir triton
+      ) &> /var/log/sage_build.log &
+      BUILD_PID=$!
+  else
+      BUILD_PID=""
+  fi
+else
+  BUILD_PID=""
+fi
 
 # ---------------------------------------------------------------------------
 # Copy workflows & Configs
@@ -97,7 +117,6 @@ fi
 # ---------------------------------------------------------------------------
 # REPO UPDATES & INSTALLS
 # ---------------------------------------------------------------------------
-# Note: Using subshells ( ) prevents directory drift so we don't install repos inside other repos
 
 echo "Updating ComfyUI..."
 ( cd /ComfyUI && git pull && pip install -r requirements.txt )
