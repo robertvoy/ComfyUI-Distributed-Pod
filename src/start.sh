@@ -152,7 +152,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# DOWNLOAD FUNCTION (High Speed Retry Strategy)
+# DOWNLOAD FUNCTION
 # ---------------------------------------------------------------------------
 hf_get() {
   local repo="$1" rel="$2" dest="$3"
@@ -166,51 +166,24 @@ hf_get() {
 
   mkdir -p "$dest_dir"
   
-  # Ensure High Speed is ON
+  # Ensure HF Transfer is enabled
   export HF_HUB_ENABLE_HF_TRANSFER=1
-  
-  local retries=0
-  local max_retries=5
-  local success=false
 
-  echo "Downloading $filename (High Speed)..."
-
-  while [ $retries -lt $max_retries ]; do
-    # Try the download
-    if hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir"; then
-      success=true
-      break
-    else
-      retries=$((retries + 1))
-      echo "----------------------------------------------------------------"
-      echo "Download failed (Attempt $retries/$max_retries)."
-      
-      if [ $retries -lt $max_retries ]; then
-        echo "Retrying High Speed download in 3 seconds..."
-        sleep 3
-      else
-        echo "All $max_retries attempts failed."
-      fi
-      echo "----------------------------------------------------------------"
-    fi
-  done
-
-  # If we exhausted retries without success, return error (killing the script)
-  if [ "$success" = "false" ]; then
-    echo "CRITICAL ERROR: Could not download $filename after $max_retries attempts."
-    return 1
-  fi
+  # Download using the native HF client
+  echo "Downloading $filename..."
+  hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
   
   # Handle the nested structure hf download creates
   local src="$dest_dir/$rel"
   if [ "$src" != "$dest" ] && [ -f "$src" ]; then
       mv -f "$src" "$dest"
+      # Cleanup empty directories left behind
       rmdir -p "$(dirname "$src")" 2>/dev/null || true
   fi
 }
 
 # ---------------------------------------------------------------------------
-# PRESET 1: VIDEO UPSCALER
+# PRESET: VIDEO UPSCALER
 # ---------------------------------------------------------------------------
 if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
   echo "Preparing Video Upscaler Preset"
@@ -228,18 +201,14 @@ if [ "${PRESET_VIDEO_UPSCALER:-false}" != "false" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# PRESET 2: WAN 2.2 FP16
+# PRESET: WAN 2.2 T2V
 # ---------------------------------------------------------------------------
-if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
-  echo "Preparing Wan 2.2 FP16 Preset (I2V + T2V)"
+if [ "${PRESET_WAN_2_2_T2V:-false}" != "false" ]; then
+  echo "Preparing Wan 2.2 T2V Preset"
 
-  # Text Encoders & VAE
+  # Common Dependencies
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
-  
-  # Diffusion Models (I2V)
-  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
-  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
   
   # Diffusion Models (T2V)
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
@@ -251,17 +220,53 @@ if [ "${PRESET_WAN2_2_FP16:-false}" != "false" ]; then
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
 
+  echo "Wan 2.2 T2V Preset: Complete."
+fi
+
+# ---------------------------------------------------------------------------
+# PRESET: WAN 2.2 I2V
+# ---------------------------------------------------------------------------
+if [ "${PRESET_WAN_2_2_I2V:-false}" != "false" ]; then
+  echo "Preparing Wan 2.2 I2V Preset"
+
+  # Common Dependencies
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
+  
+  # Diffusion Models (I2V)
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp16.safetensors" 
+
   # LoRAs (I2V)
   hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022.safetensors"
   hf_get "lightx2v/Wan2.2-Distill-Loras" "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors"
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors" 
   hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" "/workspace/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors" 
 
-  echo "Wan 2.2 FP16 Preset: Complete."
+  echo "Wan 2.2 I2V Preset: Complete."
 fi
 
 # ---------------------------------------------------------------------------
-# PRESET 3: Z-IMAGE TURBO
+# PRESET: WAN 2.1 VACE
+# ---------------------------------------------------------------------------
+if [ "${PRESET_WAN_2_1_VACE:-false}" != "false" ]; then
+  echo "Preparing Wan 2.1 VACE Preset"
+
+  # Common Dependencies
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/text_encoders/umt5_xxl_fp16.safetensors" "/workspace/ComfyUI/models/clip/umt5_xxl_fp16.safetensors" 
+  hf_get "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" "split_files/vae/wan_2.1_vae.safetensors" "/workspace/ComfyUI/models/vae/wan_2.1_vae.safetensors" 
+
+  # VACE Model (Note: Repo is 2.1 repackaged, not 2.2)
+  hf_get "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors" "/workspace/ComfyUI/models/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
+
+  # VACE LoRA
+  hf_get "Kijai/WanVideo_comfy" "Wan21_CausVid_14B_T2V_lora_rank32.safetensors" "/workspace/ComfyUI/models/loras/Wan21_CausVid_14B_T2V_lora_rank32.safetensors"
+
+  echo "Wan 2.1 VACE Preset: Complete."
+fi
+
+# ---------------------------------------------------------------------------
+# PRESET: Z-IMAGE TURBO
 # ---------------------------------------------------------------------------
 if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
   echo "Preparing Z-Image Turbo Preset"
@@ -301,17 +306,6 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
       done
     fi
   )
-fi
-
-# ---------------------------------------------------------------------------
-# ENABLE TERMINAL AUTOCOMPLETE
-# ---------------------------------------------------------------------------
-if ! grep -q "bash_completion" /root/.bashrc; then
-    cat >> /root/.bashrc <<'EOF'
-if [ -f /usr/share/bash-completion/bash_completion ]; then
-    . /usr/share/bash-completion/bash_completion
-fi
-EOF
 fi
 
 # ---------------------------------------------------------------------------
