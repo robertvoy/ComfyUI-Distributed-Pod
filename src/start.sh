@@ -98,37 +98,69 @@ fi
 # REPO UPDATES & INSTALLS
 # ---------------------------------------------------------------------------
 
-echo "Updating ComfyUI..."
+# Helper function to clone/update nodes and install requirements
+update_node() {
+    local url="$1"
+    local repo_name=$(basename "$url" .git)
+    local target_dir="/ComfyUI/custom_nodes/$repo_name"
+
+    echo "Updating $repo_name..."
+    if [ -d "$target_dir" ]; then
+        ( cd "$target_dir" && git pull )
+    else
+        git clone "$url" "$target_dir"
+    fi
+
+    # Only install requirements if the file actually exists
+    if [ -f "$target_dir/requirements.txt" ]; then
+        ( cd "$target_dir" && pip install -r requirements.txt )
+    fi
+    
+    # Impact Pack specific: install binaries if needed
+    if [ "$repo_name" == "ComfyUI-Impact-Pack" ] && [ -f "$target_dir/install.py" ]; then
+        ( cd "$target_dir" && python3 install.py )
+    fi
+}
+
+echo "Updating ComfyUI Core..."
 ( cd /ComfyUI && git pull && pip install -r requirements.txt )
 
+# Special handling for ComfyUI-Distributed (Branch selection + No requirements.txt)
 echo "Updating ComfyUI-Distributed..."
-( cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git fetch origin && git checkout "${DISTRIBUTED_BRANCH:-main}" && git pull origin "${DISTRIBUTED_BRANCH:-main}" )
+if [ -d "/ComfyUI/custom_nodes/ComfyUI-Distributed" ]; then
+    ( 
+      cd "/ComfyUI/custom_nodes/ComfyUI-Distributed"
+      git fetch origin
+      git checkout "${DISTRIBUTED_BRANCH:-main}"
+      git pull origin "${DISTRIBUTED_BRANCH:-main}"
+    )
+else
+    git clone https://github.com/robertvoy/ComfyUI-Distributed.git /ComfyUI/custom_nodes/ComfyUI-Distributed
+    ( cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git checkout "${DISTRIBUTED_BRANCH:-main}" )
+fi
 
-echo "Updating WanVideoWrapper..."
-( cd /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper && git pull && pip install -r requirements.txt )
+# ---------------------------------------------------------------------------
+# Standard Node Installs
+# ---------------------------------------------------------------------------
 
-echo "Updating KJNodes..."
-( cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && git pull && pip install -r requirements.txt )
-
-echo "Install RES4LYF..."
-( cd /ComfyUI/custom_nodes/ && { [ -d "RES4LYF" ] || git clone https://github.com/ClownsharkBatwing/RES4LYF; } && cd RES4LYF && pip install -r requirements.txt )
-
-echo "Install ComfyUI-LongLook..."
-( cd /ComfyUI/custom_nodes/ && { [ -d "comfyUI-LongLook" ] || git clone https://github.com/shootthesound/comfyUI-LongLook; } )
-
-echo "Install Inpaint-CropAndStitch..."
-( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-Inpaint-CropAndStitch" ] || git clone https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch; } )
-
-echo "Install SeedVR2..."
-( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-SeedVR2_VideoUpscaler" ] || git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler; } && cd ComfyUI-SeedVR2_VideoUpscaler && pip install -r requirements.txt )
-
-echo "Install Easy-Sam3..."
-( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-Easy-Sam3" ] || git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
-
-# Download SAM3 Model
-echo "Downloading SAM3 Model..."
-mkdir -p /workspace/ComfyUI/models/sam3
-hf download yolain/sam3-safetensors sam3-fp16.safetensors --local-dir /workspace/ComfyUI/models/sam3
+update_node "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git"
+update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
+update_node "https://github.com/rgthree/rgthree-comfy.git"
+update_node "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git"
+update_node "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
+update_node "https://github.com/Fannovel16/comfyui_controlnet_aux.git"
+update_node "https://github.com/cubiq/ComfyUI_essentials.git"
+update_node "https://github.com/welltop-cn/ComfyUI-TeaCache.git"
+update_node "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git"
+update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
+update_node "https://github.com/chflame163/ComfyUI_LayerStyle.git"
+update_node "https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git"
+update_node "https://github.com/yolain/ComfyUI-Easy-Use.git"
+update_node "https://github.com/city96/ComfyUI-GGUF.git"
+update_node "https://github.com/ClownsharkBatwing/RES4LYF.git"
+update_node "https://github.com/shootthesound/comfyUI-LongLook.git"
+update_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git"
+update_node "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git"
 
 # ---------------------------------------------------------------------------
 # SAGEATTENTION BUILD
@@ -181,6 +213,20 @@ hf_get() {
       rmdir -p "$(dirname "$src")" 2>/dev/null || true
   fi
 }
+
+# ---------------------------------------------------------------------------
+# PRESET: SAM3
+# ---------------------------------------------------------------------------
+if [ "${PRESET_SAM3:-false}" != "false" ]; then
+  echo "Install Easy-Sam3..."
+  ( cd /ComfyUI/custom_nodes/ && { [ -d "ComfyUI-Easy-Sam3" ] || git clone https://github.com/yolain/ComfyUI-Easy-Sam3; } && cd ComfyUI-Easy-Sam3 && pip install -r requirements.txt )
+
+  # Download SAM3 Model using hf_get for consistency
+  echo "Downloading SAM3 Model..."
+  hf_get "yolain/sam3-safetensors" "sam3-fp16.safetensors" "/workspace/ComfyUI/models/sam3/sam3-fp16.safetensors"
+  
+  echo "SAM3 Preset: Complete."
+fi
 
 # ---------------------------------------------------------------------------
 # PRESET: VIDEO UPSCALER
@@ -327,7 +373,7 @@ fi
 # ---------------------------------------------------------------------------
 if ! pgrep -f "main.py --listen" > /dev/null; then
   echo "Launching ComfyUI"
-  ARGS="--listen --enable-cors-header"
+  ARGS="--listen --enable-cors-header --preview-method auto"
   [ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
   nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
 fi
