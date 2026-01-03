@@ -115,11 +115,6 @@ update_node() {
     if [ -f "$target_dir/requirements.txt" ]; then
         ( cd "$target_dir" && pip install -r requirements.txt )
     fi
-    
-    # Impact Pack specific: install binaries if needed
-    if [ "$repo_name" == "ComfyUI-Impact-Pack" ] && [ -f "$target_dir/install.py" ]; then
-        ( cd "$target_dir" && python3 install.py )
-    fi
 }
 
 echo "Updating ComfyUI Core..."
