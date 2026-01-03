@@ -22,6 +22,7 @@ comfyui:
       photomaker: models/photomaker/
       RMBG: models/RMBG/
       sams: models/sams/
+      sam3: models/sam3/
       style_models: models/style_models/
       text_encoders: models/text_encoders/
       unet: models/unet/
