@@ -120,7 +120,7 @@ update_node() {
 echo "Updating ComfyUI Core..."
 ( cd /ComfyUI && git pull && pip install -r requirements.txt )
 
-# Special handling for ComfyUI-Distributed (Branch selection + No requirements.txt)
+# Special handling for ComfyUI-Distributed (Branch selection)
 echo "Updating ComfyUI-Distributed..."
 if [ -d "/ComfyUI/custom_nodes/ComfyUI-Distributed" ]; then
     ( 
@@ -132,6 +132,15 @@ if [ -d "/ComfyUI/custom_nodes/ComfyUI-Distributed" ]; then
 else
     git clone https://github.com/robertvoy/ComfyUI-Distributed.git /ComfyUI/custom_nodes/ComfyUI-Distributed
     ( cd /ComfyUI/custom_nodes/ComfyUI-Distributed && git checkout "${DISTRIBUTED_BRANCH:-main}" )
+fi
+
+# Conditional Install for Inpaint CropAndStitch
+if [ "${CROP_STITCH_FORK:-false}" == "true" ]; then
+    # Use your fork if variable is set
+    update_node "https://github.com/robertvoy/ComfyUI-Inpaint-CropAndStitch.git"
+else
+    # Default to original repo
+    update_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git"
 fi
 
 # ---------------------------------------------------------------------------
@@ -154,7 +163,6 @@ update_node "https://github.com/yolain/ComfyUI-Easy-Use.git"
 update_node "https://github.com/city96/ComfyUI-GGUF.git"
 update_node "https://github.com/ClownsharkBatwing/RES4LYF.git"
 update_node "https://github.com/shootthesound/comfyUI-LongLook.git"
-update_node "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git"
 update_node "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git"
 
 # ---------------------------------------------------------------------------
