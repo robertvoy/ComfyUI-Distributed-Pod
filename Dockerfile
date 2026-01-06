@@ -34,12 +34,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Runtime libraries
+# Runtime libraries (Updated with fixes)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install pyyaml gdown triton comfy-cli jupyterlab jupyterlab-lsp \
         jupyter-server jupyter-server-terminals \
-        ipykernel jupyterlab_code_formatter
-
+        ipykernel jupyterlab_code_formatter \
+        "timm<1.0.0" \
+        onnx onnxruntime-gpu
+        
 # ------------------------------------------------------------
 # ComfyUI install
 # ------------------------------------------------------------
@@ -60,7 +62,6 @@ RUN for repo in \
     https://github.com/ltdrdata/ComfyUI-Impact-Pack.git \
     https://github.com/Fannovel16/comfyui_controlnet_aux.git \
     https://github.com/cubiq/ComfyUI_essentials.git \
-    https://github.com/welltop-cn/ComfyUI-TeaCache.git \
     https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git \
     https://github.com/kijai/ComfyUI-WanVideoWrapper.git \
     https://github.com/chflame163/ComfyUI_LayerStyle.git \
