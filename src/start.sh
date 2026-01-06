@@ -149,7 +149,6 @@ fi
 
 update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
 update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
-update_node "https://github.com/yolain/ComfyUI-Easy-Use.git"
 
 # ---------------------------------------------------------------------------
 # SAGEATTENTION BUILD
