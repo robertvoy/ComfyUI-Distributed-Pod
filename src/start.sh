@@ -78,6 +78,7 @@ comfyui:
   hypernetworks: models/hypernetworks/
   ipadapter: models/ipadapter/
   lama: models/lama/
+  latent_upscale_models: models/latent_upscale_models/
   loras: models/loras/
   onnx: models/onnx/
   photomaker: models/photomaker/
@@ -212,7 +213,7 @@ if [ "${PRESET_LTX2:-false}" != "false" ]; then
   hf_get "Comfy-Org/ltx-2" "split_files/text_encoders/gemma_3_12B_it.safetensors" "/workspace/ComfyUI/models/clip/gemma_3_12B_it.safetensors"
 
   # 3. Main Diffusion Model (19B Dev)
-  hf_get "Lightricks/LTX-2" "ltx-2-19b-dev.safetensors" "/workspace/ComfyUI/models/diffusion_models/ltx-2-19b-dev.safetensors"
+  hf_get "Lightricks/LTX-2" "ltx-2-19b-dev.safetensors" "/workspace/ComfyUI/models/checkpoints/ltx-2-19b-dev.safetensors"
 
   # 4. Spatial Upscaler
   hf_get "Lightricks/LTX-2" "ltx-2-spatial-upscaler-x2-1.0.safetensors" "/workspace/ComfyUI/models/upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors"
