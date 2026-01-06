@@ -203,6 +203,27 @@ hf_get() {
 }
 
 # ---------------------------------------------------------------------------
+# PRESET: LTX2
+# ---------------------------------------------------------------------------
+if [ "${PRESET_LTX2:-false}" != "false" ]; then
+  echo "Preparing LTX-2 Preset"
+
+  # 2. Text Encoder (Gemma 3 12B)
+  hf_get "Comfy-Org/ltx-2" "split_files/text_encoders/gemma_3_12B_it.safetensors" "/workspace/ComfyUI/models/clip/gemma_3_12B_it.safetensors"
+
+  # 3. Main Diffusion Model (19B Dev)
+  hf_get "Lightricks/LTX-2" "ltx-2-19b-dev.safetensors" "/workspace/ComfyUI/models/diffusion_models/ltx-2-19b-dev.safetensors"
+
+  # 4. Spatial Upscaler
+  hf_get "Lightricks/LTX-2" "ltx-2-spatial-upscaler-x2-1.0.safetensors" "/workspace/ComfyUI/models/upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors"
+
+  # 5. Distilled LoRA (384)
+  hf_get "Lightricks/LTX-2" "ltx-2-19b-distilled-lora-384.safetensors" "/workspace/ComfyUI/models/loras/ltx-2-19b-distilled-lora-384.safetensors"
+
+  echo "LTX-2 Preset: Complete."
+fi
+
+# ---------------------------------------------------------------------------
 # PRESET: SAM3
 # ---------------------------------------------------------------------------
 if [ "${PRESET_SAM3:-false}" != "false" ]; then
