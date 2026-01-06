@@ -17,6 +17,7 @@ comfyui:
       hypernetworks: models/hypernetworks/
       ipadapter: models/ipadapter/
       lama: models/lama/
+      latent_upscale_models: models/latent_upscale_models/
       loras: models/loras/
       onnx: models/onnx/
       photomaker: models/photomaker/
