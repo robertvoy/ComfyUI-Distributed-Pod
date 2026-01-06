@@ -356,8 +356,13 @@ if [ -n "${BUILD_PID:-}" ]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# RUNTIME ENV FIXES
+# ---------------------------------------------------------------------------
 # Force timm back to 0.9.16 to fix LayerStyle_Advance
 pip install "timm==0.9.16" > /dev/null 2>&1
+# FORCE reinstall onnxruntime-gpu 
+pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ > /dev/null 2>&1
 
 # ---------------------------------------------------------------------------
 # Launch
