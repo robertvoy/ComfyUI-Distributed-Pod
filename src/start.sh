@@ -147,23 +147,9 @@ fi
 # Standard Node Installs
 # ---------------------------------------------------------------------------
 
-update_node "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git"
 update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
-update_node "https://github.com/rgthree/rgthree-comfy.git"
-update_node "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git"
-update_node "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
-update_node "https://github.com/Fannovel16/comfyui_controlnet_aux.git"
-update_node "https://github.com/cubiq/ComfyUI_essentials.git"
-update_node "https://github.com/welltop-cn/ComfyUI-TeaCache.git"
-update_node "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git"
 update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
-update_node "https://github.com/chflame163/ComfyUI_LayerStyle.git"
-update_node "https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git"
 update_node "https://github.com/yolain/ComfyUI-Easy-Use.git"
-update_node "https://github.com/city96/ComfyUI-GGUF.git"
-update_node "https://github.com/ClownsharkBatwing/RES4LYF.git"
-update_node "https://github.com/shootthesound/comfyUI-LongLook.git"
-update_node "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git"
 
 # ---------------------------------------------------------------------------
 # SAGEATTENTION BUILD
