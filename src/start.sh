@@ -216,7 +216,7 @@ if [ "${PRESET_LTX2:-false}" != "false" ]; then
   hf_get "Lightricks/LTX-2" "ltx-2-19b-dev.safetensors" "/workspace/ComfyUI/models/checkpoints/ltx-2-19b-dev.safetensors"
 
   # 4. Spatial Upscaler
-  hf_get "Lightricks/LTX-2" "ltx-2-spatial-upscaler-x2-1.0.safetensors" "/workspace/ComfyUI/models/upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors"
+  hf_get "Lightricks/LTX-2" "ltx-2-spatial-upscaler-x2-1.0.safetensors" "/workspace/ComfyUI/models/latent_upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors"
 
   # 5. Distilled LoRA (384)
   hf_get "Lightricks/LTX-2" "ltx-2-19b-distilled-lora-384.safetensors" "/workspace/ComfyUI/models/loras/ltx-2-19b-distilled-lora-384.safetensors"
