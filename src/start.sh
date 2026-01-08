@@ -419,7 +419,7 @@ pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.v
 if ! pgrep -f "main.py --listen" > /dev/null; then
   echo "Launching ComfyUI"
   ARGS="--listen --enable-cors-header --preview-method auto"
-  [ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
+  # [ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
   nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
 fi
 
