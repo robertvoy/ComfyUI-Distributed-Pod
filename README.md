@@ -51,6 +51,13 @@ This image uses environment variables to control installed nodes and model downl
 | `HF_API_TOKEN` | - | Required for downloading gated models (via Presets). |
 | `CIVITAI_API_TOKEN` | - | Token for CivitAI model downloads. |
 
+### ⚠️ SageAttention Usage (Important)
+
+**SageAttention is NOT enabled globally by default**, even if `SAGE_ATTENTION` is set to `true`.
+
+* **Why?** SageAttention is known to break **Qwen Image** models. To allow users to mix Qwen and other models in the same session, we do not force the `--use-sage-attention` launch argument.
+* **How to use:** If you want to use SageAttention (e.g., for Wan 2.2 or LTX), please add the **`Patch Model with SageAttention`** node to your workflow and connect it to your diffusion model.
+
 ### Model Presets
 
 Set any of the following to `true` to automatically download the relevant models, LoRAs, and text encoders to the correct directories on startup.
