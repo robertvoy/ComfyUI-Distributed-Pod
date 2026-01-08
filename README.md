@@ -24,7 +24,7 @@ A high-performance Docker container for running ComfyUI with distributed computi
 
 1. Go to RunPod and select "Deploy".
 
-> **Note:** Ensure you filter pods by CUDA version 12.8.
+> **Note:** Ensure you filter pods by CUDA version 12.8 or higher.
 
 2. Search for "ComfyUI Distributed Pod" template.
 3. Configure your pod settings (see Environment Variables below) and deploy.
