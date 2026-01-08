@@ -338,13 +338,13 @@ if [ "${PRESET_ZIMAGE_TURBO:-false}" != "false" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# PRESET: QWEN EDIT 2512
+# PRESET: QWEN EDIT 2511
 # ---------------------------------------------------------------------------
-if [ "${PRESET_QWEN_EDIT_2512:-false}" != "false" ]; then
-  echo "Preparing Qwen Edit 2512 Preset"
+if [ "${PRESET_QWEN_EDIT_2511:-false}" != "false" ]; then
+  echo "Preparing Qwen Edit 2511 Preset"
 
   # Diffusion Model
-  hf_get "Comfy-Org/Qwen-Image_ComfyUI" "split_files/diffusion_models/qwen_image_2512_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/qwen_image_2512_bf16.safetensors"
+  hf_get "Comfy-Org/Qwen-Image-Edit_ComfyUI" "split_files/diffusion_models/qwen_image_edit_2511_bf16.safetensors" "/workspace/ComfyUI/models/diffusion_models/qwen_image_edit_2511_bf16.safetensors"
 
   # VAE
   hf_get "Comfy-Org/Qwen-Image_ComfyUI" "split_files/vae/qwen_image_vae.safetensors" "/workspace/ComfyUI/models/vae/qwen_image_vae.safetensors"
@@ -352,8 +352,8 @@ if [ "${PRESET_QWEN_EDIT_2512:-false}" != "false" ]; then
   # Text Encoder
   hf_get "Comfy-Org/Qwen-Image_ComfyUI" "split_files/text_encoders/qwen_2.5_vl_7b.safetensors" "/workspace/ComfyUI/models/clip/qwen_2.5_vl_7b.safetensors"
 
-  # LoRAs (Lightning)
-  hf_get "lightx2v/Qwen-Image-2512-Lightning" "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors" "/workspace/ComfyUI/models/loras/Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors"
+  # LoRAs
+  hf_get "lightx2v/Qwen-Image-Edit-2511-Lightning" "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors" "/workspace/ComfyUI/models/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
 
   # LoRA (Next Scene)
   hf_get "lovis93/next-scene-qwen-image-lora-2509" "next-scene_lora-v2-3000.safetensors" "/workspace/ComfyUI/models/loras/next-scene_lora-v2-3000.safetensors"
@@ -361,7 +361,7 @@ if [ "${PRESET_QWEN_EDIT_2512:-false}" != "false" ]; then
   # LoRA (Multiple Angles)
   hf_get "fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA" "qwen-image-edit-2511-multiple-angles-lora.safetensors" "/workspace/ComfyUI/models/loras/qwen-image-edit-2511-multiple-angles-lora.safetensors"
 
-  echo "Qwen Edit 2512 Preset: Complete."
+  echo "Qwen Edit 2511 Preset: Complete."
 fi
 
 # ---------------------------------------------------------------------------
