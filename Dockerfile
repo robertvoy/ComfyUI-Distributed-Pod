@@ -60,6 +60,7 @@ RUN for repo in \
     https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
     https://github.com/robertvoy/ComfyUI-Distributed.git \
     https://github.com/ltdrdata/ComfyUI-Impact-Pack.git \
+    https://github.com/ltdrdata/ComfyUI-Inspire-Pack.git \
     https://github.com/Fannovel16/comfyui_controlnet_aux.git \
     https://github.com/cubiq/ComfyUI_essentials.git \
     https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git \
