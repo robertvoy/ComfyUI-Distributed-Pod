@@ -6,7 +6,8 @@ ulimit -n 65535 || true
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
-python3 -m pip install --upgrade "huggingface_hub[cli]" hf_transfer
+python3 -m pip install -U hf_transfer
+
 export HF_HUB_ENABLE_HF_TRANSFER=1
 export HF_HUB_DISABLE_XET=1
 export PYTHONUNBUFFERED=1
@@ -19,20 +20,6 @@ export GIT_MERGE_AUTOEDIT=no
 if [ -f "/workspace/additional_params.sh" ]; then
   chmod +x /workspace/additional_params.sh
   /workspace/additional_params.sh
-fi
-
-# ---------------------------------------------------------------------------
-# Install dependencies
-# ---------------------------------------------------------------------------
-PACKAGES=""
-if ! which curl >/dev/null 2>&1; then PACKAGES="$PACKAGES curl"; fi
-if ! which tail >/dev/null 2>&1; then PACKAGES="$PACKAGES coreutils"; fi
-if ! dpkg -s bash-completion >/dev/null 2>&1; then PACKAGES="$PACKAGES bash-completion"; fi
-
-if [ -n "$PACKAGES" ]; then
-  echo "Installing missing packages: $PACKAGES"
-  dpkg --configure -a || true
-  apt-get update && apt-get install -y $PACKAGES
 fi
 
 URL="http://127.0.0.1:8188"
@@ -58,41 +45,7 @@ fi
 if [ -f "/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml" ]; then
   cp "/ComfyUI-Distributed-Pod/src/extra_model_paths.yaml" "$COMFYUI_DIR/extra_model_paths.yaml"
 else
-  cat > "$COMFYUI_DIR/extra_model_paths.yaml" <<'EOL'
-comfyui:
-  base_path: /workspace/ComfyUI
-  is_default: true
-  BiRefNet: models/BiRefNet/
-  checkpoints: models/checkpoints/
-  clip: models/clip/
-  clip_vision: models/clip_vision/
-  configs: models/configs/
-  controlnet: models/controlnet/
-  diffusers: models/diffusers/
-  diffusion_models: models/diffusion_models/
-  embeddings: models/embeddings/
-  florence2: models/florence2/
-  facerestore_models: models/facerestore_models/
-  gligen: models/gligen/
-  grounding-dino: models/grounding-dino/
-  hypernetworks: models/hypernetworks/
-  ipadapter: models/ipadapter/
-  lama: models/lama/
-  latent_upscale_models: models/latent_upscale_models/
-  loras: models/loras/
-  onnx: models/onnx/
-  photomaker: models/photomaker/
-  RMBG: models/RMBG/
-  sams: models/sams/
-  sam3: models/sam3/
-  style_models: models/style_models/
-  text_encoders: models/text_encoders/
-  unet: models/unet/
-  upscale_models: models/upscale_models/
-  vae: models/vae/
-  vae_approx: models/vae_approx/
-  vitmatte: models/vitmatte/
-EOL
+  echo "WARNING: extra_model_paths.yaml was expected but not found."
 fi
 
 # ---------------------------------------------------------------------------
@@ -413,15 +366,22 @@ pip install "timm==0.9.16" > /dev/null 2>&1
 # FORCE reinstall onnxruntime-gpu 
 pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ > /dev/null 2>&1
 
+comfyui_${RUNPOD_POD_ID:-local}_nohup.log
+
 # ---------------------------------------------------------------------------
 # Launch
 # ---------------------------------------------------------------------------
+LOG_FILE="/comfyui_${RUNPOD_POD_ID:-local}.log"
+
 if ! pgrep -f "main.py --listen" > /dev/null; then
   echo "Launching ComfyUI"
   ARGS="--listen --enable-cors-header --preview-method auto"
-  # [ "${SAGE_ATTENTION:-true}" != "false" ] && ARGS="$ARGS --use-sage-attention"
-  nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "/comfyui_${RUNPOD_POD_ID:-local}_nohup.log" 2>&1 &
+  nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "$LOG_FILE" 2>&1 &
 fi
 
-echo "ComfyUI is ready"
-sleep infinity
+echo "----------------------------------------------------------------"
+echo "Streaming logs from: $LOG_FILE"
+echo "----------------------------------------------------------------"
+
+touch "$LOG_FILE"
+tail -f "$LOG_FILE"
