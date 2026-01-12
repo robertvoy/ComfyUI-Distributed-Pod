@@ -366,8 +366,6 @@ pip install "timm==0.9.16" > /dev/null 2>&1
 # FORCE reinstall onnxruntime-gpu 
 pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ > /dev/null 2>&1
 
-comfyui_${RUNPOD_POD_ID:-local}_nohup.log
-
 # ---------------------------------------------------------------------------
 # Launch
 # ---------------------------------------------------------------------------
