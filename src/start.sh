@@ -145,7 +145,7 @@ hf_get() {
 
   # Download using the native HF client
   echo "Downloading $filename..."
-  hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir" >/dev/null 2>&1
+  hf download "$repo" --include "$rel" --revision main --local-dir "$dest_dir"
   
   # Handle the nested structure hf download creates
   local src="$dest_dir/$rel"
@@ -362,9 +362,10 @@ fi
 # RUNTIME ENV FIXES
 # ---------------------------------------------------------------------------
 # Force timm back to 0.9.16 to fix LayerStyle_Advance
-pip install "timm==0.9.16" > /dev/null 2>&1
+pip install "timm==0.9.16"
+
 # FORCE reinstall onnxruntime-gpu 
-pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ > /dev/null 2>&1
+pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
 
 # ---------------------------------------------------------------------------
 # Launch
