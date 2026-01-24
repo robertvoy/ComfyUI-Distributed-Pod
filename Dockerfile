@@ -65,7 +65,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ------------------------------------------------------------
 # INSTALL NUNCHAKU (Wheel for Torch 2.9)
 # ------------------------------------------------------------
-ARG NUNCHAKU_WHEEL_URL="https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.0/nunchaku-1.2.0+torch2.9-cp312-cp312-linux_x86_64.whl"
+ARG NUNCHAKU_WHEEL_URL="https://github.com/nunchaku-ai/nunchaku/releases/download/v1.1.0/nunchaku-1.1.0+torch2.9-cp312-cp312-linux_x86_64.whl"
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install "${NUNCHAKU_WHEEL_URL}" --constraint /tmp/constraints.txt
