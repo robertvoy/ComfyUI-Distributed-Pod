@@ -106,7 +106,7 @@ fi
 # ---------------------------------------------------------------------------
 
 
-#update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
+# update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
 # update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
 
 
@@ -318,33 +318,6 @@ if [ "${PRESET_FLUX_2_KLEIN_9B:-false}" != "false" ]; then
   hf_get "black-forest-labs/FLUX.2-klein-9B" "flux-2-klein-9b.safetensors" "/workspace/ComfyUI/models/diffusion_models/flux-2-klein-9b.safetensors"
 
   echo "Flux.2 Klein Preset: Complete."
-fi
-
-# ---------------------------------------------------------------------------
-# Nunchaku
-# ---------------------------------------------------------------------------
-if [ "${NUNCHAKU:-false}" != "false" ]; then
-  echo "Installing Nunchaku..."
-  (
-    set -e
-    cd /ComfyUI/custom_nodes
-    [ ! -d "ComfyUI-nunchaku" ] && git clone https://github.com/nunchaku-tech/ComfyUI-nunchaku/ || (cd ComfyUI-nunchaku && git pull)
-    
-    TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0][:3])")
-    check_url() { curl --head --silent --fail "$1" > /dev/null 2>&1; }
-    
-    WHEEL_BASE="https://github.com/nunchaku-tech/nunchaku/releases/download/v1.1.0"
-    WHEEL_URL="${WHEEL_BASE}/nunchaku-1.1.0+torch${TORCH_VERSION}-cp312-cp312-linux_x86_64.whl"
-    
-    if check_url "${WHEEL_URL}"; then
-      pip install "${WHEEL_URL}"
-    else
-      for VER in 3.0 2.9 2.8 2.7 2.6 2.5 2.4 2.3; do
-        FB_URL="${WHEEL_BASE}/nunchaku-1.0.0+torch${VER}-cp312-cp312-linux_x86_64.whl"
-        if check_url "${FB_URL}"; then pip install "${FB_URL}"; break; fi
-      done
-    fi
-  )
 fi
 
 # ---------------------------------------------------------------------------
