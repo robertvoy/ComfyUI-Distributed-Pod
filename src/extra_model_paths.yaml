@@ -17,11 +17,15 @@ comfyui:
       hypernetworks: models/hypernetworks/
       ipadapter: models/ipadapter/
       lama: models/lama/
+      latent_upscale_models: models/latent_upscale_models/
+      LLM: models/LLM/
       loras: models/loras/
+      model_patches: models/model_patches/
       onnx: models/onnx/
       photomaker: models/photomaker/
       RMBG: models/RMBG/
       sams: models/sams/
+      sam3: models/sam3/
       style_models: models/style_models/
       text_encoders: models/text_encoders/
       unet: models/unet/
