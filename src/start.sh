@@ -77,6 +77,8 @@ update_node() {
 echo "Updating ComfyUI Core..."
 ( cd /ComfyUI && git pull && pip install -r requirements.txt )
 
+pip install -r /ComfyUI/manager_requirements.txt
+
 # Special handling for ComfyUI-Distributed (Branch selection)
 echo "Updating ComfyUI-Distributed..."
 if [ -d "/ComfyUI/custom_nodes/ComfyUI-Distributed" ]; then
@@ -336,7 +338,7 @@ LOG_FILE="/comfyui_${RUNPOD_POD_ID:-local}.log"
 
 if ! pgrep -f "main.py --listen" > /dev/null; then
   echo "Launching ComfyUI"
-  ARGS="--listen --enable-cors-header --preview-method auto"
+  ARGS="--listen --enable-cors-header --preview-method auto --enable-manager-legacy-ui"
   nohup python3 "$COMFYUI_DIR/main.py" $ARGS > "$LOG_FILE" 2>&1 &
 fi
 
