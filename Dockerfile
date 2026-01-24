@@ -61,15 +61,6 @@ ARG FLASH_ATTN_WHEEL_URL="https://github.com/mjun0812/flash-attention-prebuild-w
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install "${FLASH_ATTN_WHEEL_URL}" --constraint /tmp/constraints.txt
 
-
-# ------------------------------------------------------------
-# INSTALL NUNCHAKU (Wheel for Torch 2.9)
-# ------------------------------------------------------------
-ARG NUNCHAKU_WHEEL_URL="https://github.com/nunchaku-ai/nunchaku/releases/download/v1.1.0/nunchaku-1.1.0+torch2.9-cp312-cp312-linux_x86_64.whl"
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install "${NUNCHAKU_WHEEL_URL}" --constraint /tmp/constraints.txt
-
 # ------------------------------------------------------------
 # INSTALL COMFYUI & NODES
 # ------------------------------------------------------------
@@ -98,7 +89,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       git clone --depth 1 https://github.com/ClownsharkBatwing/RES4LYF.git & \
       git clone --depth 1 https://github.com/crystian/ComfyUI-Crystools & \
       git clone --depth 1 https://github.com/kijai/ComfyUI-Florence2 & \
-      git clone --depth 1 https://github.com/nunchaku-tech/ComfyUI-nunchaku & \
       git clone --depth 1 https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git & \
       git clone --depth 1 https://github.com/shootthesound/comfyUI-LongLook.git & \
       wait \

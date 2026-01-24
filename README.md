@@ -45,11 +45,8 @@ This image uses environment variables to control installed nodes and model downl
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SAGE_ATTENTION` | `true` | Set to `false` to disable building SageAttention. |
-| `NUNCHAKU` | `true` | Set to `false` to skip installing Nunchaku. |
 | `DISTRIBUTED_BRANCH` | `main` | Select a specific branch for ComfyUI-Distributed. |
-| `CROP_STITCH_FORK` | `false` | Set to `true` to use the RobertVoy fork of Inpaint CropAndStitch. |
 | `HF_API_TOKEN` | - | Required for downloading gated models (via Presets). |
-| `CIVITAI_API_TOKEN` | - | Token for CivitAI model downloads. |
 
 ### ⚠️ SageAttention Usage (Important)
 
@@ -74,6 +71,7 @@ Set any of the following to `true` to automatically download the relevant models
 | `PRESET_QWEN_EDIT_2511` | **Qwen Image Edit 2.5** BF16, Qwen VL 7B, VAE, Lightning, Next Scene & Camera Angle LoRAs. |
 | `PRESET_ZIMAGE_TURBO` | **Z-Image Turbo**, Qwen 3 4B, VAE. |
 | `PRESET_SAM3` | **SAM3 Model** (and installs ComfyUI-Easy-Sam3 node). |
+| `PRESET_FLUX_2_KLEIN_9B` | **FLUX.2 Klein 9B Model**, VAE etc. |
 
 ## 📁 Directory Structure
 
