@@ -104,8 +104,9 @@ fi
 # UPDATE NODES
 # ---------------------------------------------------------------------------
 
-update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
-update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
+
+#update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
+# update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +322,7 @@ fi
 # ---------------------------------------------------------------------------
 # Nunchaku
 # ---------------------------------------------------------------------------
-if [ "${NUNCHAKU:-true}" != "false" ]; then
+if [ "${NUNCHAKU:-false}" != "false" ]; then
   echo "Installing Nunchaku..."
   (
     set -e
@@ -337,7 +338,7 @@ if [ "${NUNCHAKU:-true}" != "false" ]; then
     if check_url "${WHEEL_URL}"; then
       pip install "${WHEEL_URL}"
     else
-      for VER in 2.8 2.7 2.6 2.5 2.4 2.3; do
+      for VER in 3.0 2.9 2.8 2.7 2.6 2.5 2.4 2.3; do
         FB_URL="${WHEEL_BASE}/nunchaku-1.0.0+torch${VER}-cp312-cp312-linux_x86_64.whl"
         if check_url "${FB_URL}"; then pip install "${FB_URL}"; break; fi
       done
