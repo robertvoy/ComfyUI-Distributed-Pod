@@ -1,66 +1,93 @@
 # ComfyUI Distributed Pod
 
-A high-performance Docker container for running ComfyUI with distributed computing capabilities on RunPod. This template enables multi-GPU workflows for AI image and video generation, with pre-installed custom nodes and optimized settings.
+A high-performance Docker container for running ComfyUI with distributed computing capabilities. This template enables multi-GPU workflows for AI image and video generation, with pre-installed custom nodes, optimized settings, and **smart model presets**.
 
-## 🚀 Features
+## Features
 
-- **Distributed Computing**: Built-in support for ComfyUI-Distributed workflows across multiple GPUs/pods
-- **Pre-installed Custom Nodes**: Essential nodes for advanced workflows including upscaling, video processing, and more
-- **CUDA Optimized**: Built on NVIDIA CUDA 12.8.1 with cuDNN support
-- **Jupyter Lab**: Integrated Jupyter Lab for easy file management and code editing
-- **SageAttention Support**: Optional high-performance attention mechanism for faster inference
-- **Ready-to-Use Workflows**: Includes distributed workflows for various tasks
+* **Distributed Computing**: Built-in support for [ComfyUI-Distributed](https://github.com/robertvoy/ComfyUI-Distributed) workflows across multiple GPUs/pods.
+* **Smart Model Presets**: Environment variables to automatically download and configure models (Wan 2.2, LTX-2, Qwen, SAM3) on launch.
+* **Nunchaku Integration**: Optional pre-installed support for Nunchaku (SVD/Flux quantization and inference).
+* **SageAttention Support**: Optional high-performance attention mechanism for faster inference.
+* **Pre-installed Custom Nodes**: Essential nodes including WanVideoWrapper, KJNodes, Easy Use, and more.
+* **CUDA Optimized**: Built on NVIDIA CUDA 12.8.1 with cuDNN support.
+* **Jupyter Lab**: Integrated Jupyter Lab for easy file management.
 
-## 📋 Prerequisites
+## Prerequisites
 
-- RunPod account with GPU pods
-- Basic understanding of ComfyUI
-- (Optional) Multiple pods for distributed workflows
+* RunPod account with GPU pods.
+* Basic understanding of ComfyUI.
+* (Optional) Multiple pods for distributed workflows.
 
-## 🛠️ Quick Start on RunPod
+## Quick Start on RunPod
 
 ### Option 1: Use Pre-built Template
-1. Go to RunPod and select "Deploy"
-> Make sure you filter pods by CUDA version 12.8
-2. Search for "ComfyUI Distributed Pod" template
-3. Configure your pod settings and deploy
+
+1. Go to RunPod and select "Deploy".
+
+> **Note:** Ensure you filter pods by CUDA version 12.8 or higher.
+
+2. Search for "ComfyUI Distributed Pod" template.
+3. Configure your pod settings (see Environment Variables below) and deploy.
 
 ### Option 2: Deploy from Docker
+
 ```bash
 docker pull robertvoy/comfyui-distributed-pod:latest
+
 ```
 
-### Option 3: Build from Source
-```bash
-git clone https://github.com/robertvoy/ComfyUI-Distributed-Pod.git
-cd ComfyUI-Distributed-Pod
-docker build -t comfyui-distributed-pod .
-```
+## Configuration & Environment Variables
 
-## 🔧 Configuration
+This image uses environment variables to control installed nodes and model downloads. Set these in your RunPod configuration to customize the instance.
 
-### Environment Variables
+### General Configuration
 
-- `SAGE_ATTENTION`: Set to `false` to disable SageAttention
-- `CIVITAI_API_TOKEN`: Your CivitAI API token for model downloads
-- `HF_API_TOKEN`: Your Hugging Face API token for model downloads
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SAGE_ATTENTION` | `true` | Set to `false` to disable building SageAttention. |
+| `NUNCHAKU` | `true` | Set to `false` to skip installing Nunchaku. |
+| `DISTRIBUTED_BRANCH` | `main` | Select a specific branch for ComfyUI-Distributed. |
+| `CROP_STITCH_FORK` | `false` | Set to `true` to use the RobertVoy fork of Inpaint CropAndStitch. |
+| `HF_API_TOKEN` | - | Required for downloading gated models (via Presets). |
+| `CIVITAI_API_TOKEN` | - | Token for CivitAI model downloads. |
 
-### Exposed Ports
+### ⚠️ SageAttention Usage (Important)
 
-- **8188**: ComfyUI Web Interface
-- **8888**: Jupyter Lab
-- **8189,8190,8191**: For workers if using multi-GPU pods. Add more if you need
+**SageAttention is NOT enabled globally by default**, even if `SAGE_ATTENTION` is set to `true`.
+
+* **Why?** SageAttention is known to break **Qwen Image** models. To allow users to mix Qwen and other models in the same session, we do not force the `--use-sage-attention` launch argument.
+* **How to use:** If you want to use SageAttention (e.g., for Wan 2.2 or LTX), please add the **`Patch Model with SageAttention`** node to your workflow and connect it to your diffusion model.
+
+---
+
+### Model Presets
+
+Set any of the following to `true` to automatically download the relevant models, LoRAs, and text encoders to the correct directories on startup.
+
+| Preset Variable | Models Included |
+| --- | --- |
+| `PRESET_LTX2` | **LTX-2 19B Dev**, Gemma 3 12B, Spatial Upscaler, Distilled LoRA. |
+| `PRESET_WAN_2_2_T2V` | **Wan 2.2 T2V** FP16 (Low/High Noise 14B), UMT5 XXL, VAE, Lightning LoRAs. |
+| `PRESET_WAN_2_2_I2V` | **Wan 2.2 I2V** FP16 (Low/High Noise 14B), UMT5 XXL, VAE, Lightning LoRAs. |
+| `PRESET_WAN_2_1_VACE` | **Wan 2.1 VACE**, UMT5 XXL, VAE, CausVid LoRA. |
+| `PRESET_VIDEO_UPSCALER` | **Wan 2.2 (FP8)**, UMT5 XXL, VAE, 4xNomos8kDAT, Lightning LoRAs. |
+| `PRESET_QWEN_EDIT_2511` | **Qwen Image Edit 2.5** BF16, Qwen VL 7B, VAE, Lightning, Next Scene & Camera Angle LoRAs. |
+| `PRESET_ZIMAGE_TURBO` | **Z-Image Turbo**, Qwen 3 4B, VAE. |
+| `PRESET_SAM3` | **SAM3 Model** (and installs ComfyUI-Easy-Sam3 node). |
 
 ## 📁 Directory Structure
 
 ```
 /ComfyUI              # Main ComfyUI installation
-/workspace            # Persistent storage for models and outputs (if using network drive)
+/workspace            # Persistent storage (Models go here)
+  ├── ComfyUI/models  # Mapped model paths
+  └── ...
+
 ```
 
-## 🎨 Included Workflows
+## Included Workflows
 
-The template includes several pre-configured distributed workflows:
+The template includes several pre-configured distributed workflows located in `/ComfyUI/user/default/workflows`:
 
 1. **distributed-txt2img.json**
 2. **distributed-upscale.json**
@@ -68,22 +95,17 @@ The template includes several pre-configured distributed workflows:
 4. **distributed-upscale-video.json**
 5. **distributed-wan.json**
 
-## 🔌 Pre-installed Custom Nodes
+## Pre-installed Custom Nodes
 
-- ComfyUI-Distributed
-- UltimateSDUpscale
-- KJNodes
-- rgthree-comfy
-- VideoHelperSuite
-- ComfyUI-Impact-Pack
-- ControlNet Auxiliary
-- ComfyUI Essentials
-- TeaCache
-- Frame Interpolation
-- LayerStyle & LayerStyle Advance
-- Easy-Use
-- GGUF support
+* **Core:** ComfyUI-Distributed, KJNodes, ComfyUI Essentials, rgthree-comfy
+* **Video:** ComfyUI-WanVideoWrapper, VideoHelperSuite, Frame Interpolation
+* **Generation/Editing:** ComfyUI-nunchaku, ComfyUI-Easy-Sam3, ComfyUI-Inpaint-CropAndStitch
+* **Utility:** LayerStyle & LayerStyle Advance, Easy-Use, GGUF support
 
-## 🚀 Using Distributed Features
+## Using Distributed Features
 
-Learn more about [ComfyUI-Distributed](https://github.com/robertvoy/ComfyUI-Distributed)
+To use the distributed capabilities:
+
+1. Ensure ports `8189-8191` are exposed on worker nodes.
+2. Configure the Master node to point to the Worker IPs.
+3. Learn more about the setup at [ComfyUI-Distributed](https://github.com/robertvoy/ComfyUI-Distributed).

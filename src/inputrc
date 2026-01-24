@@ -1,0 +1,45 @@
+# ~/.inputrc - Readline configuration
+
+# Enable 8-bit input
+set input-meta on
+set output-meta on
+set convert-meta off
+
+# Use visible bell instead of audible
+set bell-style visible
+
+# Show all completions at once
+set show-all-if-ambiguous on
+set show-all-if-unmodified on
+
+# Case-insensitive completion
+set completion-ignore-case on
+
+# Treat hyphens and underscores as equivalent for completion
+set completion-map-case on
+
+# Add trailing slash to directories on completion
+set mark-directories on
+set mark-symlinked-directories on
+
+# Color files by type during completion
+set colored-stats on
+set visible-stats on
+
+# Skip completion of hidden files unless . is typed
+set match-hidden-files off
+
+# Arrow keys search history
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+# Ctrl+Left/Right to move by word
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
+
+# Home/End keys
+"\e[H": beginning-of-line
+"\e[F": end-of-line
+
+# Delete key
+"\e[3~": delete-char
