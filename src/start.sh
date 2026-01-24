@@ -82,6 +82,7 @@ echo "Updating ComfyUI-Distributed..."
 if [ -d "/ComfyUI/custom_nodes/ComfyUI-Distributed" ]; then
     ( 
       cd "/ComfyUI/custom_nodes/ComfyUI-Distributed"
+      git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
       git fetch origin
       git checkout "${DISTRIBUTED_BRANCH:-main}"
       git pull origin "${DISTRIBUTED_BRANCH:-main}"
