@@ -107,26 +107,6 @@ fi
 update_node "https://github.com/kijai/ComfyUI-KJNodes.git"
 update_node "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
 
-# ---------------------------------------------------------------------------
-# SAGEATTENTION BUILD
-# ---------------------------------------------------------------------------
-if [ "${SAGE_ATTENTION:-true}" != "false" ]; then
-  if [ ! -d "SageAttention" ]; then
-      echo "Starting SageAttention build in background (this takes time)..."
-      (
-        set -e
-        git clone https://github.com/thu-ml/SageAttention.git || true
-        cd SageAttention
-        pip install . --no-build-isolation
-        pip install --no-cache-dir triton
-      ) &> /var/log/sage_build.log &
-      BUILD_PID=$!
-  else
-      BUILD_PID=""
-  fi
-else
-  BUILD_PID=""
-fi
 
 # ---------------------------------------------------------------------------
 # DOWNLOAD FUNCTION
@@ -370,27 +350,9 @@ fi
 # ---------------------------------------------------------------------------
 # Force timm back to 0.9.16 to fix LayerStyle_Advance
 # pip install "timm==0.9.16"
-# WAIT FOR SAGEATTENTION BUILD TO FINISH
-# ---------------------------------------------------------------------------
-if [ -n "${BUILD_PID:-}" ]; then
-  if kill -0 "$BUILD_PID" 2>/dev/null; then
-      echo "----------------------------------------------------------------"
-      echo "Waiting for SageAttention build to finish..."
-      echo "You can monitor progress with: tail -f /var/log/sage_build.log"
-      echo "----------------------------------------------------------------"
-      # This tails the log until the PID (SageAttention build) finishes
-      tail -f /var/log/sage_build.log --pid=$BUILD_PID
-  fi
-fi
-
-# ---------------------------------------------------------------------------
-# RUNTIME ENV FIXES
-# ---------------------------------------------------------------------------
-# Force timm back to 0.9.16 to fix LayerStyle_Advance
-pip install "timm==0.9.16"
 
 # FORCE reinstall onnxruntime-gpu 
-pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
+# pip install --force-reinstall onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
 
 # ---------------------------------------------------------------------------
 # Launch
