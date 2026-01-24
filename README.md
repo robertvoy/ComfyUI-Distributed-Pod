@@ -6,7 +6,6 @@ A high-performance Docker container for running ComfyUI with distributed computi
 
 * **Distributed Computing**: Built-in support for [ComfyUI-Distributed](https://github.com/robertvoy/ComfyUI-Distributed) workflows across multiple GPUs/pods.
 * **Smart Model Presets**: Environment variables to automatically download and configure models (Wan 2.2, LTX-2, Qwen, SAM3) on launch.
-* **Nunchaku Integration**: Optional pre-installed support for Nunchaku (SVD/Flux quantization and inference).
 * **SageAttention Support**: Optional high-performance attention mechanism for faster inference.
 * **Pre-installed Custom Nodes**: Essential nodes including WanVideoWrapper, KJNodes, Easy Use, and more.
 * **CUDA Optimized**: Built on NVIDIA CUDA 12.8.1 with cuDNN support.
