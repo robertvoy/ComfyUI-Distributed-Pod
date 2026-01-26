@@ -6,6 +6,8 @@ if [ -f /usr/lib/x86_64-linux-gnu/libcuda.so.1 ] && [ ! -f /usr/lib/x86_64-linux
     echo "Created libcuda.so symlink for Triton."
 fi
 
+ulimit -n 65535 || true
+
 TCMALLOC="$(ldconfig -p | awk '/libtcmalloc\.so\.[0-9]+/ {print $NF; exit}')"
 [ -n "${TCMALLOC:-}" ] && export LD_PRELOAD="$TCMALLOC"
 
